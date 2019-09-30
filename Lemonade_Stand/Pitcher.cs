@@ -8,9 +8,8 @@ namespace Lemonade_Stand
 {
     class Pitcher
     {
-
         //member variables (Has A)
-
+        public int cupsLeftInPitcher;
 
 
 

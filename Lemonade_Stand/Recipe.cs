@@ -10,7 +10,10 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-
+        public int ammountOfLemons;
+        public int ammountOfSugarCubes;
+        public int ammountOfIceCubes;
+        public double pricePerCup;
 
 
 
