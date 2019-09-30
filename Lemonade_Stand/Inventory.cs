@@ -9,6 +9,10 @@ namespace Lemonade_Stand
     class Inventory
     {
         //member variables (Has A)
+        public List<Lemon> lemons;
+        public List<IceCube> iceCubes;
+        public List<Cups> cups;
+        public List<SugarCube> sugarCubes;
 
 
 

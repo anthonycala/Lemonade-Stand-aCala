@@ -10,7 +10,10 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-
+        public string condition;
+        public int temperature;
+        private List<string> weatherConditions;
+        public string predictedForecast;
 
 
 
