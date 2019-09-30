@@ -10,6 +10,12 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
+        public string name;
+        public Inventory inventory;
+        public Wallet wallet;
+        public Recipe recipe;
+        public Pitcher pitcher;
+        public double businessProfits;
 
 
 
