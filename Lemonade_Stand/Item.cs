@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace Lemonade_Stand
 {
-    class Lemon : Item
+    class Item
     {
         //member variables (Has A)
-
+        public string name;
 
 
 
@@ -21,7 +21,5 @@ namespace Lemonade_Stand
 
 
         // member methods
-
-
     }
 }

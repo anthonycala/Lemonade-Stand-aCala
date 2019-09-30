@@ -6,7 +6,20 @@ using System.Threading.Tasks;
 
 namespace Lemonade_Stand
 {
-    class IceCubes
+    class IceCubes : Item
     {
+        //member variables (Has A)
+
+
+
+
+        // Constructor
+
+
+
+
+
+
+        // member methods
     }
 }
