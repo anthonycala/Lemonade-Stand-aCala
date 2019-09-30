@@ -10,7 +10,7 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-
+        Player player;
 
 
 

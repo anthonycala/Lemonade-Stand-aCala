@@ -9,7 +9,8 @@ namespace Lemonade_Stand
     class Day
     {
         //member variables (Has A)
-
+        public Weather weather;
+        public List<Customer> customers;
 
 
 
