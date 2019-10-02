@@ -10,37 +10,41 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-        public string condition;
-        public int temperature;
-        private List<string> weatherConditions;
-        public string predictedForecast;
-
-
+        public string Condition;
+        public int Temperature;
+        private List<string> WeatherConditions;
+        public string PredictedForecast;
 
         // Constructor
         public Weather()
         {
-            weatherConditions = new List<string>() { "Sunny", "Cloudy", "Rainy", "Foggy" };
-            condition = TodaysCondition();
+            WeatherConditions = new List<string>() { "Sunny", "Cloudy", "Rainy", "Foggy" };
+            Condition = TodaysCondition();
+            Temperature = TodaysTemperature();
+            PredictedForecast = TodaysForcast();
 
         }
+        // member methods
+
         public string TodaysCondition()
         {
             Random rng = new Random();
             int num = rng.Next(4);
-            return weatherConditions[num];
+            return WeatherConditions[num];
         }
-        //public string TodaysForcast()
-        //{
-          //  Random rng = new Random();
-            //int num = rng.Next();
-            //return predictedForecast[num];
-        //}
+        public string TodaysForcast()
+        {
+            Random rng = new Random();
+            int num = rng.Next(4);
+            return WeatherConditions[num];
+        }
+        public int TodaysTemperature()
+        {
+            Random rng = new Random();
+            int num = rng.Next(60, 100);
+            return num;
+            
 
-
-
-
-
-        // member methods
+        }
     }
 }
