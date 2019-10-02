@@ -9,10 +9,10 @@ namespace Lemonade_Stand
     class Inventory
     {
         //member variables (Has A)
-        public List<Lemon> lemons;
-        public List<IceCube> iceCubes;
-        public List<Cups> cups;
-        public List<SugarCube> sugarCubes;
+        public List<Lemon> Lemons;
+        public List<IceCubes> IceCubes;
+        public List<Cups> Cups;
+        public List<SugarCube> SugarCubes;
 
 
 
@@ -20,14 +20,18 @@ namespace Lemonade_Stand
         // Constructor
         public Inventory()
         {
-
+            Lemons = new List<Lemon>();
+            IceCubes = new List<IceCubes>();
+            Cups = new List<Cups>();
+            SugarCubes = new List<SugarCube>();
+      
         }
 
 
+        
+
+     }
 
 
-
-        // member methods
-
-    }
+       
 }

@@ -20,6 +20,16 @@ namespace Lemonade_Stand
 
         }
 
+        public void SellLemons()
+        {
+            Console.WriteLine("How many lemons do you want to buy");
+            int amount = int.Parse(Console.ReadLine());
+            for (int i = 0; i < amount; i++)
+            {
+
+            }
+            player.inventory.Lemons.Add(new Lemon());
+        }
 
 
 
