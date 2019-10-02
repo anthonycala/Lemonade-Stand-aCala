@@ -13,6 +13,7 @@ namespace Lemonade_Stand
         public List<IceCubes> IceCubes;
         public List<Cups> Cups;
         public List<SugarCube> SugarCubes;
+        
 
 
 
@@ -27,7 +28,7 @@ namespace Lemonade_Stand
       
         }
 
-
+        // member methods
         
 
      }
