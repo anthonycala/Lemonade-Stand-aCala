@@ -14,8 +14,10 @@ namespace Lemonade_Stand
 
 
         // Constructor
+        public Cups()
+        {
 
-
+        }
 
 
 

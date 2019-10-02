@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace Lemonade_Stand
 {
     class IceCubes : Item
+
     {
         //member variables (Has A)
 
@@ -14,7 +15,10 @@ namespace Lemonade_Stand
 
 
         // Constructor
+        public IceCubes()
+        {
 
+        }
 
 
 

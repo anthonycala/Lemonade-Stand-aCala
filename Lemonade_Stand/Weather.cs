@@ -20,8 +20,22 @@ namespace Lemonade_Stand
         // Constructor
         public Weather()
         {
+            weatherConditions = new List<string>() { "Sunny", "Cloudy", "Rainy", "Foggy" };
+            condition = TodaysCondition();
 
         }
+        public string TodaysCondition()
+        {
+            Random rng = new Random();
+            int num = rng.Next(4);
+            return weatherConditions[num];
+        }
+        //public string TodaysForcast()
+        //{
+          //  Random rng = new Random();
+            //int num = rng.Next();
+            //return predictedForecast[num];
+        //}
 
 
 

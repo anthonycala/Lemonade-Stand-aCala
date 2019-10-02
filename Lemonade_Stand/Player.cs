@@ -21,7 +21,10 @@ namespace Lemonade_Stand
 
 
         // Constructor
+        public Player()
+        {
 
+        }
 
 
 

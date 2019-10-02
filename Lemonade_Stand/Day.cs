@@ -12,10 +12,13 @@ namespace Lemonade_Stand
         public Weather weather;
         public List<Customer> customers;
 
-
+        public string DayOfWeek;
 
         // Constructor
-
+        public Day(string dayOfWeek)
+        {
+            DayOfWeek = dayOfWeek;
+        }
 
 
 
