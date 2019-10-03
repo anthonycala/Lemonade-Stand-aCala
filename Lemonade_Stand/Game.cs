@@ -33,6 +33,19 @@ namespace Lemonade_Stand
 
 
         // member methods
+        public void RunGame()
+        {
+            Console.WriteLine("Welcome to Lemmonade Stand");
+            CreatePlayer();
+
+            
+        }
+        public void CreatePlayer()
+        {
+            player = new Player();
+        }
+
+        
     }
     
 

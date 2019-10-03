@@ -23,7 +23,12 @@ namespace Lemonade_Stand
         // Constructor
         public Player()
         {
-
+            name = PlayersName();
+            inventory = new Inventory();
+            wallet = new Wallet();
+            recipe = new Recipe();
+            pitcher = new Pitcher();
+            businessProfits = 0;
         }
 
 
@@ -31,5 +36,14 @@ namespace Lemonade_Stand
 
 
         // member methods
+
+        public string PlayersName()
+        {
+            Console.WriteLine("Enter your name");
+            name = Console.ReadLine();
+            return name;
+        }
+
     }
+
 }
