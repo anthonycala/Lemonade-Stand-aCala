@@ -10,7 +10,7 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-        private double money;
+        public double money;
 
 
 

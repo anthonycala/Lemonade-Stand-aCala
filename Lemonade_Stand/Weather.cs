@@ -43,7 +43,6 @@ namespace Lemonade_Stand
             Random rng = new Random();
             int num = rng.Next(60, 100);
             return num;
-            
 
         }
     }
