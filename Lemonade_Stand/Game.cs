@@ -37,8 +37,8 @@ namespace Lemonade_Stand
         {
             Console.WriteLine("Welcome to Lemmonade Stand");
             CreatePlayer();
-            
-            
+            player.recipe.SetRecipe();
+
         }
         public void CreatePlayer()
         {

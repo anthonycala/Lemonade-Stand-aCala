@@ -50,10 +50,15 @@ namespace Lemonade_Stand
             }
 
         }
-        public void RunDay()
+        public void RunDay(Store store, Player player)
         {
-            
-
+            Console.WriteLine(weather.Temperature);
+            Console.WriteLine(weather.Condition);
+            store.SellLemons();
+            store.SellIceCubes();
+            store.SellCups();
+            store.SellSugarCubes();
+            player.recipe.SetRecipe();
 
 
         }

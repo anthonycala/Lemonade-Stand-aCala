@@ -10,6 +10,7 @@ namespace Lemonade_Stand
     {
         static void Main(string[] args)
         {
+            var thing = Console.Read();
             Game game = new Game();
             game.RunGame();
         }

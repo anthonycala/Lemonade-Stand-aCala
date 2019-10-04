@@ -23,7 +23,7 @@ namespace Lemonade_Stand
             amountOfLemons = 0;
             amountOfSugarCubes = 0;
             amountOfIceCubes = 0;
-            pricePerCup = 0;
+            pricePerCup = 0; 
         }
 
 
@@ -32,17 +32,16 @@ namespace Lemonade_Stand
 
         public void SetRecipe()
         {
+           
             Console.WriteLine("How many lemons per pitcher?");
-            amountOfLemons = Console.Read(); 
+            amountOfLemons = int.Parse(Console.ReadLine()); 
             Console.WriteLine("How many sugar cubes per pitcher?");
-            amountOfSugarCubes = Console.Read();
-            Console.WriteLine("How many sugar cubes per pitcher?");
-            amountOfSugarCubes = Console.Read();
+            amountOfSugarCubes = int.Parse(Console.ReadLine());
+            Console.WriteLine("How many ice cubes per pitcher?");
+            amountOfSugarCubes = int.Parse(Console.ReadLine());
+
         }
-        public void SetRecipe()
-        {
-            
-        }
+        
      }
 }
 
