@@ -59,9 +59,17 @@ namespace Lemonade_Stand
             store.SellCups(player);
             store.SellSugarCubes(player);
             player.recipe.SetRecipe();
+            BuyLemonade(player.recipe);
 
 
         }
 
+        public void BuyLemonade(Recipe recipe)
+        {
+            for (int i = 0; i < customers.Count; i++)
+            {
+                customers[i].BuyLogic(recipe);
+            }
+        }
     }
 }
