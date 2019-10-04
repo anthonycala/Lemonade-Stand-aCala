@@ -11,7 +11,9 @@ namespace Lemonade_Stand
         //member variables (Has A)
         private List<string> names;
         public string name;
-
+        int lemmonPref;
+        int sugarPref;
+        int iceCubePref;
 
 
 
@@ -21,7 +23,21 @@ namespace Lemonade_Stand
 
         }
 
-
+        public bool BuyLogic(Recipe recipe)
+        {
+            if (lemmonPref == recipe.amountOfLemons)
+            {
+                return true;
+            }
+            else if(sugarPref == recipe.amountOfSugarCubes)
+            {
+                return true;
+            }
+            else if (iceCubePref == recipe.amountOfIceCubes)
+            {
+                return true;
+            }
+        }
 
 
 

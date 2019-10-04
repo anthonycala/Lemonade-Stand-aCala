@@ -11,6 +11,7 @@ namespace Lemonade_Stand
         //member variables (Has A)
         Player player;
         List<Day> days;
+        Store store;
         int currentDay;
 
 
@@ -26,6 +27,7 @@ namespace Lemonade_Stand
             days.Add(new Day("Friday"));
             days.Add(new Day("Saturday"));
             days.Add(new Day("Sunday"));
+            store = new Store();
         }
 
 
@@ -37,14 +39,21 @@ namespace Lemonade_Stand
         {
             Console.WriteLine("Welcome to Lemmonade Stand");
             CreatePlayer();
-            player.recipe.SetRecipe();
+            RunDays();
+            
 
         }
         public void CreatePlayer()
         {
             player = new Player();
         }
-
+        public void RunDays()
+        {
+            for (int i = 0; i < days.Count; i++)
+            {
+                days[i].RunDay(store, player);
+            }
+        }
         
     }
     

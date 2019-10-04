@@ -10,7 +10,7 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-        Player player;
+        
         public double LemonPrices;
         public double SugarCubePrices;
         public double CupPrices;
@@ -28,7 +28,7 @@ namespace Lemonade_Stand
 
         }
 
-        public void SellLemons()
+        public void SellLemons(Player player)
         {
             Console.WriteLine("How many lemons do you want to buy?");
             int amount = int.Parse(Console.ReadLine());
@@ -39,7 +39,7 @@ namespace Lemonade_Stand
             player.wallet.money -= LemonPrices * amount;
         }
 
-        public void SellIceCubes()
+        public void SellIceCubes(Player player)
         {
             Console.WriteLine("How many ice cubes do you want to buy?");
             int ammount = int.Parse(Console.ReadLine());
@@ -50,7 +50,7 @@ namespace Lemonade_Stand
             player.wallet.money -= IceCubesPrices * ammount;        
         }
     
-        public void SellCups()
+        public void SellCups(Player player)
         {
             Console.WriteLine("How many cups do you want to buy?");
             int ammount = int.Parse(Console.ReadLine());
@@ -61,7 +61,7 @@ namespace Lemonade_Stand
             player.wallet.money -= CupPrices * ammount;
         }
     
-        public void SellSugarCubes()
+        public void SellSugarCubes(Player player)
         {
             Console.WriteLine("How many sugar cubes do you want to buy?");
             int ammount = int.Parse(Console.ReadLine());

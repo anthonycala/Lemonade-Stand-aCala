@@ -52,12 +52,12 @@ namespace Lemonade_Stand
         }
         public void RunDay(Store store, Player player)
         {
-            Console.WriteLine(weather.Temperature);
+            Console.WriteLine("Today's temp is: " +weather.Temperature);
             Console.WriteLine(weather.Condition);
-            store.SellLemons();
-            store.SellIceCubes();
-            store.SellCups();
-            store.SellSugarCubes();
+            store.SellLemons(player);
+            store.SellIceCubes(player);
+            store.SellCups(player);
+            store.SellSugarCubes(player);
             player.recipe.SetRecipe();
 
 
