@@ -48,6 +48,15 @@ namespace Lemonade_Stand
                 customers.Add(new Customer());
 
             }
+
         }
+        public void RunDay()
+        {
+            
+
+
+
+        }
+
     }
 }

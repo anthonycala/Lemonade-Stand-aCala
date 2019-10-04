@@ -10,9 +10,9 @@ namespace Lemonade_Stand
     {
 
         //member variables (Has A)
-        public int ammountOfLemons;
-        public int ammountOfSugarCubes;
-        public int ammountOfIceCubes;
+        public int amountOfLemons;
+        public int amountOfSugarCubes;
+        public int amountOfIceCubes;
         public double pricePerCup;
 
 
@@ -20,13 +20,29 @@ namespace Lemonade_Stand
         // Constructor
         public Recipe()
         {
-
+            amountOfLemons = 0;
+            amountOfSugarCubes = 0;
+            amountOfIceCubes = 0;
+            pricePerCup = 0;
         }
 
 
-
-
-
         // member methods
-    }
+
+
+        public void SetRecipe()
+        {
+            Console.WriteLine("How many lemons per pitcher?");
+            amountOfLemons = Console.Read(); 
+            Console.WriteLine("How many sugar cubes per pitcher?");
+            amountOfSugarCubes = Console.Read();
+            Console.WriteLine("How many sugar cubes per pitcher?");
+            amountOfSugarCubes = Console.Read();
+        }
+        public void SetRecipe()
+        {
+            
+        }
+     }
 }
+

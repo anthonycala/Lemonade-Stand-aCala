@@ -1,1 +1,6 @@
 \\Mac\Home\Desktop\Lemonade Stand\Lemonade_Stand\Lemonade-Stand-aCala\Lemonade_Stand\obj\Debug\Lemonade_Stand.csprojAssemblyReference.cache
+\\Mac\Home\Desktop\Lemonade Stand\Lemonade_Stand\Lemonade-Stand-aCala\Lemonade_Stand\bin\Debug\Lemonade_Stand.exe.config
+\\Mac\Home\Desktop\Lemonade Stand\Lemonade_Stand\Lemonade-Stand-aCala\Lemonade_Stand\bin\Debug\Lemonade_Stand.exe
+\\Mac\Home\Desktop\Lemonade Stand\Lemonade_Stand\Lemonade-Stand-aCala\Lemonade_Stand\bin\Debug\Lemonade_Stand.pdb
+\\Mac\Home\Desktop\Lemonade Stand\Lemonade_Stand\Lemonade-Stand-aCala\Lemonade_Stand\obj\Debug\Lemonade_Stand.exe
+\\Mac\Home\Desktop\Lemonade Stand\Lemonade_Stand\Lemonade-Stand-aCala\Lemonade_Stand\obj\Debug\Lemonade_Stand.pdb

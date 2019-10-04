@@ -37,7 +37,7 @@ namespace Lemonade_Stand
         {
             Console.WriteLine("Welcome to Lemmonade Stand");
             CreatePlayer();
-
+            
             
         }
         public void CreatePlayer()
