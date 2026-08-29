@@ -95,10 +95,12 @@ export default function App() {
       <div className="kiosk-grid">
         <section className="sell-panel" aria-label="Record a sale">
           <article className="product-card lemonade">
-            <img
-              src={`${import.meta.env.BASE_URL}assets/lemonade-bucket.jpg`}
-              alt="Fresh squeezed lemonade in a branded bucket"
-            />
+            <div className="logo-wrap">
+              <img
+                src={`${import.meta.env.BASE_URL}assets/lemonade-bucket.jpg`}
+                alt="Fresh squeezed lemonade in a branded bucket"
+              />
+            </div>
             <div className="product-body">
               <h2>{PRODUCTS.lemonade.name}</h2>
               <div className="product-meta">
@@ -121,10 +123,12 @@ export default function App() {
           </article>
 
           <article className="product-card slime">
-            <img
-              src={`${import.meta.env.BASE_URL}assets/slime-product.jpg`}
-              alt="Green slime jar and swirl for the slime bundle"
-            />
+            <div className="logo-wrap">
+              <img
+                src={`${import.meta.env.BASE_URL}assets/slime-product.jpg`}
+                alt="Green slime jar and swirl for the slime bundle"
+              />
+            </div>
             <div className="product-body">
               <h2>{PRODUCTS.slimeBundle.name}</h2>
               <div className="product-meta">
