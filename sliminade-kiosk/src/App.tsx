@@ -88,11 +88,15 @@ export default function App() {
   }
 
   function handleRestore() {
+    if (!canRestoreBackup) {
+      flash("No different backup yet — sell or reset first to create one");
+      return;
+    }
     const ok = restoreBackup();
     flash(
       ok
         ? "Restored previous sales and inventory from backup"
-        : "No backup found to restore"
+        : "Backup matches current counts — nothing to restore"
     );
   }
 
@@ -131,7 +135,12 @@ export default function App() {
             type="button"
             className="ghost-btn"
             onClick={handleRestore}
-            disabled={!canRestoreBackup}
+            aria-disabled={!canRestoreBackup}
+            title={
+              canRestoreBackup
+                ? "Restore the last saved sales and inventory"
+                : "Available after a sale, undo, or reset creates a backup"
+            }
           >
             Restore backup
           </button>
@@ -259,8 +268,9 @@ export default function App() {
               </div>
             </div>
             <p className="safety-hint">
-              Counts are saved on this device. Reset requires typing RESET, and
-              a backup is kept so you can restore.
+              Counts are saved on this device. Every sale creates a backup.
+              Reset requires typing RESET. Use Restore backup to bring counts
+              back.
             </p>
           </section>
 

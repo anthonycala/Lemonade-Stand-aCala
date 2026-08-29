@@ -129,7 +129,8 @@ img {
   background: var(--white);
 }
 
-.ghost-btn:disabled {
+.ghost-btn:disabled,
+.ghost-btn[aria-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
