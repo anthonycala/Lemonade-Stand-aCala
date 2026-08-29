@@ -1,0 +1,18 @@
+{
+  "name": "Nayeli's Sliminade Stand Kiosk",
+  "short_name": "Sliminade",
+  "description": "Tap to sell lemonade and slime bundles. Track inventory and hard costs.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#FFF8E7",
+  "theme_color": "#FF4FA3",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

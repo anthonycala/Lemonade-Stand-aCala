@@ -8,8 +8,10 @@ import {
   loadState,
   recordSale,
   restoreFromBackup,
+  restock,
   saveState,
-  snapshotBackup,
+  snapshotSafetyBackup,
+  stockFor,
   undoLastSale,
   type StandState,
   type StandTotals,
@@ -21,28 +23,40 @@ type Listener = () => void;
 type StoreSnapshot = {
   state: StandState;
   backupAvailable: boolean;
+  saveWarning: string | null;
   version: number;
 };
 
 let state: StandState = createInitialState();
+let saveWarning: string | null = null;
 let version = 0;
 let hydrated = false;
 const listeners = new Set<Listener>();
 
-/** Cached snapshot so useSyncExternalStore gets a stable Object.is when unchanged. */
 let cachedSnapshot: StoreSnapshot = {
   state,
   backupAvailable: false,
+  saveWarning: null,
   version: 0,
 };
 
-function emit() {
-  cachedSnapshot = {
+function rebuildSnapshot(): StoreSnapshot {
+  return {
     state,
     backupAvailable: canRestoreFromBackup(state),
+    saveWarning,
     version,
   };
+}
+
+function emit() {
+  cachedSnapshot = rebuildSnapshot();
   listeners.forEach((l) => l());
+}
+
+function persist(next: StandState) {
+  const result = saveState(next);
+  saveWarning = result.ok ? null : result.error;
 }
 
 function ensureHydrated() {
@@ -50,18 +64,14 @@ function ensureHydrated() {
   state = loadState();
   version += 1;
   hydrated = true;
-  cachedSnapshot = {
-    state,
-    backupAvailable: canRestoreFromBackup(state),
-    version,
-  };
+  cachedSnapshot = rebuildSnapshot();
 }
 
 function setState(next: StandState) {
   ensureHydrated();
   state = next;
   version += 1;
-  saveState(state);
+  persist(state);
   emit();
 }
 
@@ -70,10 +80,26 @@ function getLiveState(): StandState {
   return state;
 }
 
+let storageBound = false;
+
 function subscribe(listener: Listener) {
   ensureHydrated();
   listeners.add(listener);
-  return () => listeners.delete(listener);
+
+  if (!storageBound && typeof window !== "undefined") {
+    storageBound = true;
+    window.addEventListener("storage", (event: StorageEvent) => {
+      if (event.key !== "sliminade-kiosk-v1" && event.key !== null) return;
+      state = loadState();
+      version += 1;
+      saveWarning = null;
+      emit();
+    });
+  }
+
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 function getSnapshot(): StoreSnapshot {
@@ -85,6 +111,7 @@ function getServerSnapshot(): StoreSnapshot {
   return {
     state: createInitialState(),
     backupAvailable: false,
+    saveWarning: null,
     version: 0,
   };
 }
@@ -92,13 +119,16 @@ function getServerSnapshot(): StoreSnapshot {
 export function useStandStore(): {
   state: StandState;
   totals: StandTotals;
-  sell: (productId: ProductId) => boolean;
+  saveWarning: string | null;
+  sell: (productId: ProductId, qty?: number) => boolean;
+  restockProduct: (productId: ProductId, qty: number) => boolean;
   undo: () => void;
   reset: () => void;
   restoreBackup: () => boolean;
-  downloadSales: () => void;
+  downloadSales: () => Promise<void>;
   canRestoreBackup: boolean;
-  canSellProduct: (productId: ProductId) => boolean;
+  availableStock: (productId: ProductId) => number;
+  canSellProduct: (productId: ProductId, qty?: number) => boolean;
 } {
   const snapshot = useSyncExternalStore(
     subscribe,
@@ -109,44 +139,45 @@ export function useStandStore(): {
   return {
     state: snapshot.state,
     totals: computeTotals(snapshot.state),
-    sell: (productId) => {
+    saveWarning: snapshot.saveWarning,
+    sell: (productId, qty = 1) => {
       const current = getLiveState();
-      if (!canSell(current, productId)) return false;
-      // Keep a restore point from before this sale, then save post-sale too.
-      snapshotBackup(current, { force: true });
-      setState(recordSale(current, productId));
+      if (!canSell(current, productId, qty)) return false;
+      setState(recordSale(current, productId, qty));
+      return true;
+    },
+    restockProduct: (productId, qty) => {
+      const current = getLiveState();
+      if (qty <= 0) return false;
+      snapshotSafetyBackup(current);
+      setState(restock(current, productId, qty));
       return true;
     },
     undo: () => {
       const current = getLiveState();
       if (current.sales.length === 0) return;
-      snapshotBackup(current, { force: true });
+      snapshotSafetyBackup(current);
       setState(undoLastSale(current));
     },
     reset: () => {
       const current = getLiveState();
-      snapshotBackup(current, { force: true });
+      snapshotSafetyBackup(current);
       setState(createInitialState());
     },
     restoreBackup: () => {
       const current = getLiveState();
       const restored = restoreFromBackup();
       if (!restored) return false;
-      if (
-        restored.lemonadeStock === current.lemonadeStock &&
-        restored.slimeBundleStock === current.slimeBundleStock &&
-        restored.sales.length === current.sales.length &&
-        restored.sales[0]?.id === current.sales[0]?.id
-      ) {
-        return false;
-      }
-      // Keep what we're leaving behind, then put the backup back into live counts.
-      snapshotBackup(current, { force: true });
+      if (!canRestoreFromBackup(current)) return false;
+      // Preserve what we're leaving so Restore can toggle back if needed.
+      snapshotSafetyBackup(current);
       setState(restored);
       return true;
     },
     downloadSales: () => downloadSalesCsv(getLiveState()),
     canRestoreBackup: snapshot.backupAvailable,
-    canSellProduct: (productId) => canSell(snapshot.state, productId),
+    availableStock: (productId) => stockFor(snapshot.state, productId),
+    canSellProduct: (productId, qty = 1) =>
+      canSell(snapshot.state, productId, qty),
   };
 }

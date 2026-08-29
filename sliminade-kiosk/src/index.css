@@ -38,6 +38,7 @@ body {
     radial-gradient(ellipse 60% 40% at 50% 100%, rgba(255, 212, 77, 0.35), transparent 55%),
     linear-gradient(165deg, #fff6fb 0%, var(--cream) 45%, #f3ffe6 100%);
   background-attachment: fixed;
+  touch-action: manipulation;
 }
 
 button,
@@ -48,6 +49,13 @@ input {
 button {
   cursor: pointer;
   border: none;
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(255, 79, 163, 0.45);
+  outline-offset: 2px;
 }
 
 img {
@@ -58,7 +66,11 @@ img {
 .app {
   width: min(1120px, 100%);
   margin: 0 auto;
-  padding: 1rem 1rem 2.5rem;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(2.5rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
 }
 
 .brand-bar {
@@ -246,6 +258,18 @@ img {
   color: var(--ink);
 }
 
+.stock-chip.low {
+  background: #fff3cd;
+  border-color: #e0a800;
+  color: #7a5b00;
+}
+
+.stock-chip.empty {
+  background: #ffe0e0;
+  border-color: #d9534f;
+  color: #8a1f1b;
+}
+
 .sell-btn {
   align-self: flex-start;
   margin-top: 0.25rem;
@@ -257,6 +281,7 @@ img {
   padding: 0.85rem 1.4rem;
   border-radius: 999px;
   min-width: 11rem;
+  border: 2px solid rgba(42, 31, 61, 0.12);
   box-shadow: 0 5px 0 rgba(0, 0, 0, 0.18);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
@@ -287,12 +312,75 @@ img {
 
 .safety-note {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: var(--purple);
+  color: #5a2d82;
   text-transform: uppercase;
-  line-height: 1.25;
+  line-height: 1.3;
+}
+
+.qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.qty-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: rgba(42, 31, 61, 0.08);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.qty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qty-value {
+  min-width: 2rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.tools-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.tool-btn {
+  text-align: left;
+  border-radius: 0.9rem;
+  padding: 0.8rem 0.95rem;
+  background: rgba(255, 244, 214, 0.9);
+  border: 2px solid rgba(42, 31, 61, 0.1);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.tool-btn.selected {
+  border-color: var(--pink);
+  background: #ffe0f0;
+}
+
+.tool-btn.danger {
+  background: #ffe0ec;
+  border-color: rgba(224, 40, 127, 0.35);
+  color: var(--pink-deep);
+}
+
+.tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 @media (max-width: 520px) {
@@ -354,6 +442,10 @@ img {
 
 .stat.green {
   background: linear-gradient(160deg, #e8fbc8, #fff);
+}
+
+.stat.green.waiting {
+  background: linear-gradient(160deg, #ffe8c8, #fff);
 }
 
 .stat.pink {
@@ -496,7 +588,7 @@ img {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 1.25rem;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
   transform: translateX(-50%) translateY(120%);
   background: var(--ink);
   color: var(--white);
@@ -508,6 +600,8 @@ img {
   opacity: 0;
   transition: transform 0.35s ease, opacity 0.35s ease;
   pointer-events: none;
+  max-width: min(92vw, 420px);
+  text-align: center;
 }
 
 .toast.show {

@@ -23,29 +23,23 @@ Open the URL Vite prints (usually `http://localhost:5173`). Sales persist in the
 
 ## Website / GitHub Pages
 
-Merging to `master` runs [`.github/workflows/deploy-kiosk.yml`](../.github/workflows/deploy-kiosk.yml), which publishes the kiosk as a static website.
-
-1. In the GitHub repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**
-2. If the repo is private on a free plan, make it **public** (or use GitHub Pro) so Pages can serve it
-3. After the workflow succeeds, open:
-
 **https://anthonycala.github.io/Lemonade-Stand-aCala/**
+
+On a phone: Safari → Share → **Add to Home Screen** for a full-screen kiosk icon.
 
 ### How to test on the site
 
-1. Open the site on a phone or laptop
-2. Tap **Tap to sell** on lemonade → **Yes, sold!** → revenue should be $6, cups left 199
-3. Tap slime → read the safety warning → **Yes, sold!** → revenue $10, bundles left 79
-4. Check **Hard-cost recovery** and **Starting hard costs** ($409.50)
-5. Try **Undo last sale**, then **Reset day**
+1. Tap **Tap to sell**, set quantity if needed, confirm
+2. Open **Stand tools** → Restock / Undo / Restore / Download / Reset
+3. Reset requires typing `RESET`; Restore brings back the safety backup from Undo/Reset
+4. Check hard-cost recovery vs $409.50
 
-## Use at the stand
+### Tips for event day
 
-1. Open the app on a phone or tablet (full-screen / kiosk mode works best).
-2. Tap **Tap to sell** on lemonade or slime.
-3. Confirm the sale (slime shows the not-edible safety reminder).
-4. Watch inventory, revenue, profit, and hard-cost recovery update.
-5. Use **Undo last sale** for mistakes or **Reset day** to start fresh.
+- Use **one device** as the register (tabs sync only if they share the same browser storage)
+- Download/share the sales CSV at lunch and end of day
+- Leave private browsing off so counts can save
+- Safety backup is created on Undo/Reset and is **not** overwritten by later sales
 
 ## Stack
 

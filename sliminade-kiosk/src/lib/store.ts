@@ -5,7 +5,8 @@ import {
 } from "./business";
 
 const STORAGE_KEY = "sliminade-kiosk-v1";
-const BACKUP_KEY = "sliminade-kiosk-backup-v1";
+/** Only written before undo/reset — sales must not overwrite this. */
+const SAFETY_BACKUP_KEY = "sliminade-kiosk-safety-backup-v1";
 
 export type Sale = {
   id: string;
@@ -28,9 +29,12 @@ export type StandTotals = {
   hardCosts: number;
   profit: number;
   costRecoveryPct: number;
+  remainingToRecover: number;
   lemonadeRemaining: number;
   slimeBundlesRemaining: number;
 };
+
+export type SaveResult = { ok: true } | { ok: false; error: string };
 
 export function createInitialState(): StandState {
   return {
@@ -40,26 +44,67 @@ export function createInitialState(): StandState {
   };
 }
 
-function isValidState(value: unknown): value is StandState {
+function isProductId(value: unknown): value is ProductId {
+  return value === "lemonade" || value === "slimeBundle";
+}
+
+function isValidSale(value: unknown): value is Sale {
   if (!value || typeof value !== "object") return false;
-  const parsed = value as StandState;
+  const sale = value as Sale;
   return (
-    typeof parsed.lemonadeStock === "number" &&
-    Number.isFinite(parsed.lemonadeStock) &&
-    typeof parsed.slimeBundleStock === "number" &&
-    Number.isFinite(parsed.slimeBundleStock) &&
-    Array.isArray(parsed.sales)
+    typeof sale.id === "string" &&
+    sale.id.length > 0 &&
+    isProductId(sale.productId) &&
+    typeof sale.qty === "number" &&
+    Number.isFinite(sale.qty) &&
+    sale.qty > 0 &&
+    typeof sale.amount === "number" &&
+    Number.isFinite(sale.amount) &&
+    sale.amount >= 0 &&
+    typeof sale.at === "string"
   );
+}
+
+function sanitizeState(value: unknown): StandState | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as StandState;
+  if (
+    typeof raw.lemonadeStock !== "number" ||
+    !Number.isFinite(raw.lemonadeStock) ||
+    typeof raw.slimeBundleStock !== "number" ||
+    !Number.isFinite(raw.slimeBundleStock) ||
+    !Array.isArray(raw.sales)
+  ) {
+    return null;
+  }
+
+  const sales = raw.sales.filter(isValidSale);
+  return {
+    lemonadeStock: Math.max(0, Math.floor(raw.lemonadeStock)),
+    slimeBundleStock: Math.max(0, Math.floor(raw.slimeBundleStock)),
+    sales,
+  };
 }
 
 function readKey(key: string): StandState | null {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return isValidState(parsed) ? parsed : null;
+    return sanitizeState(JSON.parse(raw));
   } catch {
     return null;
+  }
+}
+
+function writeKey(key: string, state: StandState): SaveResult {
+  try {
+    localStorage.setItem(key, JSON.stringify(state));
+    return { ok: true };
+  } catch {
+    return {
+      ok: false,
+      error: "Couldn’t save on this device — check storage or leave private browsing.",
+    };
   }
 }
 
@@ -75,52 +120,36 @@ export function loadState(): StandState {
   const primary = readKey(STORAGE_KEY);
   if (primary) return primary;
 
-  const backup = readKey(BACKUP_KEY);
+  const backup = readKey(SAFETY_BACKUP_KEY);
   if (backup) {
-    saveState(backup);
+    writeKey(STORAGE_KEY, backup);
     return backup;
   }
 
   return createInitialState();
 }
 
-export function readBackup(): StandState | null {
-  return readKey(BACKUP_KEY);
+export function readSafetyBackup(): StandState | null {
+  return readKey(SAFETY_BACKUP_KEY);
 }
 
-/** True when backup exists and is different from the live counts. */
 export function canRestoreFromBackup(current: StandState): boolean {
-  const backup = readBackup();
+  const backup = readSafetyBackup();
   if (!backup) return false;
   return statesDiffer(backup, current);
 }
 
-export function saveState(state: StandState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+export function saveState(state: StandState): SaveResult {
+  return writeKey(STORAGE_KEY, state);
 }
 
-/**
- * Save a restore point. Skips overwriting a useful backup with an empty
- * snapshot unless `force` is set (used right before reset/undo).
- */
-export function snapshotBackup(
-  state: StandState,
-  options: { force?: boolean } = {}
-): void {
-  const existing = readBackup();
-  if (
-    !options.force &&
-    state.sales.length === 0 &&
-    existing &&
-    existing.sales.length > 0
-  ) {
-    return;
-  }
-  localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
+/** Snapshot used only for Restore after undo/reset. */
+export function snapshotSafetyBackup(state: StandState): SaveResult {
+  return writeKey(SAFETY_BACKUP_KEY, state);
 }
 
 export function restoreFromBackup(): StandState | null {
-  return readBackup();
+  return readSafetyBackup();
 }
 
 export function computeTotals(state: StandState): StandTotals {
@@ -137,6 +166,7 @@ export function computeTotals(state: StandState): StandTotals {
   const hardCosts = TOTAL_HARD_COSTS;
   const profit = revenue - hardCosts;
   const costRecoveryPct = Math.min(100, (revenue / hardCosts) * 100);
+  const remainingToRecover = Math.max(0, hardCosts - revenue);
 
   return {
     lemonadeSold,
@@ -145,43 +175,76 @@ export function computeTotals(state: StandState): StandTotals {
     hardCosts,
     profit,
     costRecoveryPct,
+    remainingToRecover,
     lemonadeRemaining: state.lemonadeStock,
     slimeBundlesRemaining: state.slimeBundleStock,
   };
 }
 
-export function canSell(state: StandState, productId: ProductId): boolean {
-  if (productId === "lemonade") return state.lemonadeStock >= 1;
-  return state.slimeBundleStock >= 1;
+export function stockFor(state: StandState, productId: ProductId): number {
+  return productId === "lemonade"
+    ? state.lemonadeStock
+    : state.slimeBundleStock;
+}
+
+export function canSell(
+  state: StandState,
+  productId: ProductId,
+  qty = 1
+): boolean {
+  return stockFor(state, productId) >= qty && qty >= 1;
 }
 
 export function recordSale(
   state: StandState,
-  productId: ProductId
+  productId: ProductId,
+  qty = 1
 ): StandState {
-  if (!canSell(state, productId)) return state;
+  const count = Math.floor(qty);
+  if (!canSell(state, productId, count)) return state;
 
   const product = PRODUCTS[productId];
   const sale: Sale = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     productId,
-    qty: 1,
-    amount: product.price,
+    qty: count,
+    amount: product.price * count,
     at: new Date().toISOString(),
   };
 
   if (productId === "lemonade") {
     return {
       ...state,
-      lemonadeStock: state.lemonadeStock - 1,
+      lemonadeStock: state.lemonadeStock - count,
       sales: [sale, ...state.sales],
     };
   }
 
   return {
     ...state,
-    slimeBundleStock: state.slimeBundleStock - 1,
+    slimeBundleStock: state.slimeBundleStock - count,
     sales: [sale, ...state.sales],
+  };
+}
+
+export function restock(
+  state: StandState,
+  productId: ProductId,
+  qty: number
+): StandState {
+  const count = Math.floor(qty);
+  if (count <= 0) return state;
+
+  if (productId === "lemonade") {
+    return {
+      ...state,
+      lemonadeStock: state.lemonadeStock + count,
+    };
+  }
+
+  return {
+    ...state,
+    slimeBundleStock: state.slimeBundleStock + count,
   };
 }
 
@@ -214,14 +277,26 @@ export function salesToCsv(state: StandState): string {
   return [header, ...rows].join("\n");
 }
 
-export function downloadSalesCsv(state: StandState): void {
+export async function downloadSalesCsv(state: StandState): Promise<void> {
   const csv = salesToCsv(state);
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  const filename = `sliminade-sales-${stamp}.csv`;
+  const file = new File([csv], filename, { type: "text/csv" });
+
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({
+      files: [file],
+      title: "Sliminade sales",
+      text: "Nayeli's Sliminade Stand sales log",
+    });
+    return;
+  }
+
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   const link = document.createElement("a");
   link.href = url;
-  link.download = `sliminade-sales-${stamp}.csv`;
+  link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
