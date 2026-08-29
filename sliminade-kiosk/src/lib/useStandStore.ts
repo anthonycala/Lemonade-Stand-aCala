@@ -3,9 +3,13 @@ import {
   canSell,
   computeTotals,
   createInitialState,
+  downloadSalesCsv,
+  hasBackup,
   loadState,
   recordSale,
+  restoreFromBackup,
   saveState,
+  snapshotBackup,
   undoLastSale,
   type StandState,
   type StandTotals,
@@ -56,6 +60,9 @@ export function useStandStore(): {
   sell: (productId: ProductId) => boolean;
   undo: () => void;
   reset: () => void;
+  restoreBackup: () => boolean;
+  downloadSales: () => void;
+  canRestoreBackup: boolean;
   canSellProduct: (productId: ProductId) => boolean;
 } {
   const current = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -68,8 +75,23 @@ export function useStandStore(): {
       setState(recordSale(current, productId));
       return true;
     },
-    undo: () => setState(undoLastSale(current)),
-    reset: () => setState(createInitialState()),
+    undo: () => {
+      if (current.sales.length === 0) return;
+      snapshotBackup(current);
+      setState(undoLastSale(current));
+    },
+    reset: () => {
+      snapshotBackup(current);
+      setState(createInitialState());
+    },
+    restoreBackup: () => {
+      const restored = restoreFromBackup();
+      if (!restored) return false;
+      setState(restored);
+      return true;
+    },
+    downloadSales: () => downloadSalesCsv(current),
+    canRestoreBackup: hasBackup(),
     canSellProduct: (productId) => canSell(current, productId),
   };
 }
