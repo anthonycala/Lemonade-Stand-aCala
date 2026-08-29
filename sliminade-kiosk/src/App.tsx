@@ -270,7 +270,7 @@ export default function App() {
             <div className="logo-wrap">
               <img
                 src={`${import.meta.env.BASE_URL}assets/slime-product.jpg`}
-                alt="Green slime jar and swirl for the slime bundle"
+                alt="Slime bundle of three colorful slime tubs — green, pink, and blue"
               />
             </div>
             <div className="product-body">
