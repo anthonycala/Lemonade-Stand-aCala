@@ -12,6 +12,9 @@ npm run dev
 
 See [sliminade-kiosk/README.md](sliminade-kiosk/README.md) for kiosk usage.
 
+**Live site (after Pages is enabled + merge to `master`):**  
+https://anthonycala.github.io/Lemonade-Stand-aCala/
+
 ## Legacy
 
 `Lemonade_Stand/` is the original .NET Framework 4.7.2 learning project and is not used by the kiosk.
