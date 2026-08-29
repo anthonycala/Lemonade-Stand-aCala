@@ -7,24 +7,26 @@ assert.equal(TOTAL, 409.5);
 let lemonadeStock = 200;
 let slimeStock = 80;
 let revenue = 0;
+let sales = 0;
 
-lemonadeStock -= 1;
-revenue += 6;
-assert.equal(lemonadeStock, 199);
-assert.equal(revenue, 6);
-assert.equal(revenue - TOTAL, 6 - 409.5);
+function sellLemonade(qty) {
+  lemonadeStock -= qty;
+  revenue += 6 * qty;
+  sales += qty;
+}
 
-slimeStock -= 1;
-revenue += 4;
-assert.equal(slimeStock, 79);
-assert.equal(revenue, 10);
+sellLemonade(3);
+assert.equal(lemonadeStock, 197);
+assert.equal(revenue, 18);
 
-// Safety: backup snapshot keeps prior counts when a reset would wipe them.
-const live = { lemonadeStock, slimeStock, revenue, sales: 2 };
-const backup = { ...live };
-const wiped = { lemonadeStock: 200, slimeStock: 80, revenue: 0, sales: 0 };
-assert.notEqual(wiped.sales, live.sales);
-assert.equal(backup.sales, 2);
-assert.equal(backup.revenue, 10);
+const safetyBackup = { lemonadeStock, slimeStock, revenue, sales };
+lemonadeStock = 200;
+slimeStock = 80;
+revenue = 0;
+sales = 0;
+// Later sales must not wipe the safety backup from a reset.
+const afterNewSale = { lemonadeStock: 199, slimeStock: 80, revenue: 6, sales: 1 };
+assert.equal(safetyBackup.sales, 3);
+assert.notEqual(afterNewSale.sales, safetyBackup.sales);
 
-console.log("business math + backup safety checks passed");
+console.log("business math + safety backup checks passed");

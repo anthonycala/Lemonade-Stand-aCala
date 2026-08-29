@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BRAND,
   HARD_COSTS,
@@ -11,29 +11,38 @@ import { useStandStore } from "./lib/useStandStore";
 import "./index.css";
 
 type PendingSale = ProductId | null;
-type GuardDialog = "undo" | "reset" | null;
+type GuardDialog = "undo" | "reset" | "restock" | "tools" | null;
 
 const RESET_PHRASE = "RESET";
+const LOW_LEMONADE = 20;
+const LOW_SLIME = 10;
 
 export default function App() {
   const {
     state,
     totals,
+    saveWarning,
     sell,
+    restockProduct,
     undo,
     reset,
     restoreBackup,
     downloadSales,
     canRestoreBackup,
+    availableStock,
     canSellProduct,
   } = useStandStore();
   const [pending, setPending] = useState<PendingSale>(null);
+  const [qty, setQty] = useState(1);
   const [guard, setGuard] = useState<GuardDialog>(null);
+  const [restockProductId, setRestockProductId] =
+    useState<ProductId>("lemonade");
   const [resetTyped, setResetTyped] = useState("");
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null
   );
   const toastTimers = useRef<number[]>([]);
+  const confirmBtnRef = useRef<HTMLButtonElement>(null);
 
   function flash(message: string) {
     toastTimers.current.forEach((id) => window.clearTimeout(id));
@@ -43,29 +52,94 @@ export default function App() {
     toastTimers.current.push(
       window.setTimeout(() => {
         setToast((current) => (current?.id === id ? null : current));
-      }, 2200)
+      }, 2400)
     );
   }
 
+  useEffect(() => {
+    let lock: WakeLockSentinel | null = null;
+
+    async function requestLock() {
+      try {
+        if (!("wakeLock" in navigator) || document.visibilityState !== "visible") {
+          return;
+        }
+        lock = await navigator.wakeLock.request("screen");
+      } catch {
+        // Wake Lock is optional on unsupported/denied devices.
+      }
+    }
+
+    void requestLock();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void requestLock();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      void lock?.release();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pending && !guard) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPending(null);
+        setGuard(null);
+        setResetTyped("");
+        setQty(1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pending, guard]);
+
+  useEffect(() => {
+    if (pending || guard === "undo" || guard === "reset" || guard === "restock") {
+      window.setTimeout(() => confirmBtnRef.current?.focus(), 0);
+    }
+  }, [pending, guard]);
+
+  function buzz() {
+    try {
+      navigator.vibrate?.(40);
+    } catch {
+      // ignore
+    }
+  }
+
   function requestSale(productId: ProductId) {
-    if (!canSellProduct(productId)) {
-      flash("Out of stock — restock needed");
+    if (!canSellProduct(productId, 1)) {
+      flash("Out of stock — use Stand tools → Restock");
       return;
     }
+    setQty(1);
     setPending(productId);
+  }
+
+  function maxQtyForPending(): number {
+    if (!pending) return 1;
+    return Math.min(5, availableStock(pending));
   }
 
   function confirmSale() {
     if (!pending) return;
     const productId = pending;
+    const count = Math.min(qty, availableStock(productId));
     setPending(null);
-    const ok = sell(productId);
+    setQty(1);
+    const ok = sell(productId, count);
     if (ok) {
+      buzz();
       const label =
         productId === "lemonade"
-          ? `Lemonade sold · ${formatMoney(PRODUCTS.lemonade.price)}`
-          : `Slime bundle sold · ${formatMoney(PRODUCTS.slimeBundle.price)}`;
+          ? `${count} lemonade${count > 1 ? "s" : ""} · ${formatMoney(PRODUCTS.lemonade.price * count)}`
+          : `${count} slime bundle${count > 1 ? "s" : ""} · ${formatMoney(PRODUCTS.slimeBundle.price * count)}`;
       flash(label);
+    } else {
+      flash("Couldn’t record sale — check stock");
     }
   }
 
@@ -77,40 +151,64 @@ export default function App() {
   function confirmUndo() {
     undo();
     closeGuard();
-    flash("Last sale undone — previous counts saved in backup");
+    flash("Last sale undone");
   }
 
   function confirmReset() {
     if (resetTyped.trim().toUpperCase() !== RESET_PHRASE) return;
     reset();
     closeGuard();
-    flash("Day reset — use Restore backup if that was a mistake");
+    flash("Day reset — tap Restore backup if that was a mistake");
+  }
+
+  function confirmRestock() {
+    const ok = restockProduct(restockProductId, 10);
+    closeGuard();
+    flash(
+      ok
+        ? restockProductId === "lemonade"
+          ? "Restocked +10 lemonade cups"
+          : "Restocked +10 slime bundles"
+        : "Couldn’t restock"
+    );
   }
 
   function handleRestore() {
     if (!canRestoreBackup) {
-      flash("No different backup yet — sell or reset first to create one");
+      flash("No restore point yet — available after Undo or Reset");
       return;
     }
     const ok = restoreBackup();
     flash(
       ok
-        ? "Restored previous sales and inventory from backup"
-        : "Backup matches current counts — nothing to restore"
+        ? "Restored sales and inventory from safety backup"
+        : "Backup matches current counts"
     );
+    setGuard(null);
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     if (state.sales.length === 0) {
       flash("No sales to download yet");
       return;
     }
-    downloadSales();
-    flash("Sales log downloaded");
+    try {
+      await downloadSales();
+      flash("Sales log ready");
+    } catch {
+      flash("Download canceled");
+    }
+    setGuard(null);
   }
 
   const pendingProduct = pending ? PRODUCTS[pending] : null;
   const resetReady = resetTyped.trim().toUpperCase() === RESET_PHRASE;
+  const paidOff = totals.costRecoveryPct >= 100;
+  const lemonadeLow =
+    totals.lemonadeRemaining > 0 && totals.lemonadeRemaining <= LOW_LEMONADE;
+  const slimeLow =
+    totals.slimeBundlesRemaining > 0 &&
+    totals.slimeBundlesRemaining <= LOW_SLIME;
 
   return (
     <div className="app">
@@ -126,41 +224,9 @@ export default function App() {
           <button
             type="button"
             className="ghost-btn"
-            onClick={handleDownload}
-            disabled={state.sales.length === 0}
+            onClick={() => setGuard("tools")}
           >
-            Download sales
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
-            onClick={handleRestore}
-            aria-disabled={!canRestoreBackup}
-            title={
-              canRestoreBackup
-                ? "Restore the last saved sales and inventory"
-                : "Available after a sale, undo, or reset creates a backup"
-            }
-          >
-            Restore backup
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
-            onClick={() => setGuard("undo")}
-            disabled={state.sales.length === 0}
-          >
-            Undo last sale
-          </button>
-          <button
-            type="button"
-            className="ghost-btn danger"
-            onClick={() => {
-              setResetTyped("");
-              setGuard("reset");
-            }}
-          >
-            Reset day
+            Stand tools
           </button>
         </div>
       </header>
@@ -180,8 +246,13 @@ export default function App() {
                 <span className="price-pill">
                   {formatMoney(PRODUCTS.lemonade.price)} each
                 </span>
-                <span className="stock-chip">
-                  {totals.lemonadeRemaining} cups left
+                <span
+                  className={`stock-chip${lemonadeLow ? " low" : ""}${totals.lemonadeRemaining === 0 ? " empty" : ""}`}
+                  aria-live="polite"
+                >
+                  {totals.lemonadeRemaining === 0
+                    ? "Sold out"
+                    : `${totals.lemonadeRemaining} cups left`}
                 </span>
               </div>
               <button
@@ -190,7 +261,7 @@ export default function App() {
                 onClick={() => requestSale("lemonade")}
                 disabled={!canSellProduct("lemonade")}
               >
-                Tap to sell
+                {canSellProduct("lemonade") ? "Tap to sell" : "Sold out"}
               </button>
             </div>
           </article>
@@ -208,8 +279,13 @@ export default function App() {
                 <span className="price-pill">
                   3 for {formatMoney(PRODUCTS.slimeBundle.price)}
                 </span>
-                <span className="stock-chip">
-                  {totals.slimeBundlesRemaining} bundles left
+                <span
+                  className={`stock-chip${slimeLow ? " low" : ""}${totals.slimeBundlesRemaining === 0 ? " empty" : ""}`}
+                  aria-live="polite"
+                >
+                  {totals.slimeBundlesRemaining === 0
+                    ? "Sold out"
+                    : `${totals.slimeBundlesRemaining} bundles left`}
                 </span>
               </div>
               <p className="safety-note">{PRODUCTS.slimeBundle.safetyWarning}</p>
@@ -219,7 +295,7 @@ export default function App() {
                 onClick={() => requestSale("slimeBundle")}
                 disabled={!canSellProduct("slimeBundle")}
               >
-                Tap to sell
+                {canSellProduct("slimeBundle") ? "Tap to sell" : "Sold out"}
               </button>
             </div>
           </article>
@@ -230,12 +306,18 @@ export default function App() {
             <h3>Today&apos;s stand</h3>
             <div className="stats-grid">
               <div className="stat">
-                <span className="label">Revenue</span>
+                <span className="label">Revenue in</span>
                 <span className="value">{formatMoney(totals.revenue)}</span>
               </div>
-              <div className="stat green">
-                <span className="label">Profit</span>
-                <span className="value">{formatMoney(totals.profit)}</span>
+              <div className={`stat green${paidOff ? "" : " waiting"}`}>
+                <span className="label">
+                  {paidOff ? "Profit after costs" : "Still to earn back"}
+                </span>
+                <span className="value">
+                  {paidOff
+                    ? formatMoney(totals.profit)
+                    : formatMoney(totals.remainingToRecover)}
+                </span>
               </div>
               <div className="stat pink">
                 <span className="label">Lemonades sold</span>
@@ -257,6 +339,7 @@ export default function App() {
               <div
                 className="progress-track"
                 role="progressbar"
+                aria-label="Hard-cost recovery"
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(totals.costRecoveryPct)}
@@ -268,9 +351,8 @@ export default function App() {
               </div>
             </div>
             <p className="safety-hint">
-              Counts are saved on this device. Every sale creates a backup.
-              Reset requires typing RESET. Use Restore backup to bring counts
-              back.
+              Counts save on this device. Undo/Reset create a safety backup.
+              Use Stand tools to restock, restore, or download the sales log.
             </p>
           </section>
 
@@ -299,12 +381,13 @@ export default function App() {
               <p className="empty">No sales yet — tap a product to start.</p>
             ) : (
               <ul className="sales-list">
-                {state.sales.slice(0, 8).map((sale) => (
+                {state.sales.slice(0, 12).map((sale) => (
                   <li key={sale.id}>
                     <span>
                       {sale.productId === "lemonade"
                         ? "Lemonade"
                         : "Slime bundle"}
+                      {sale.qty > 1 ? ` ×${sale.qty}` : ""}
                     </span>
                     <span>
                       {formatMoney(sale.amount)}{" "}
@@ -328,7 +411,7 @@ export default function App() {
         <div className="msg">{BRAND.slogan} Thank you for supporting my stand!</div>
       </footer>
 
-      {pendingProduct && (
+      {pendingProduct && pending && (
         <div className="modal-backdrop" role="presentation">
           <div
             className="modal"
@@ -338,10 +421,40 @@ export default function App() {
           >
             <h3 id="confirm-title">Confirm sale</h3>
             <p>
-              Record 1 {pendingProduct.name.toLowerCase()} for{" "}
-              <strong>{formatMoney(pendingProduct.price)}</strong>? Inventory
-              will drop by 1.
+              Sell{" "}
+              <strong>
+                {qty}{" "}
+                {pending === "lemonade"
+                  ? qty === 1
+                    ? "lemonade"
+                    : "lemonades"
+                  : qty === 1
+                    ? "slime bundle"
+                    : "slime bundles"}
+              </strong>{" "}
+              for{" "}
+              <strong>{formatMoney(pendingProduct.price * qty)}</strong>?
+              Inventory will drop by {qty}.
             </p>
+            <div className="qty-row" aria-label="Quantity">
+              <button
+                type="button"
+                className="qty-btn"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                disabled={qty <= 1}
+              >
+                −
+              </button>
+              <span className="qty-value">{qty}</span>
+              <button
+                type="button"
+                className="qty-btn"
+                onClick={() => setQty((q) => Math.min(maxQtyForPending(), q + 1))}
+                disabled={qty >= maxQtyForPending()}
+              >
+                +
+              </button>
+            </div>
             {pending === "slimeBundle" && (
               <div className="warning">{PRODUCTS.slimeBundle.safetyWarning}</div>
             )}
@@ -349,12 +462,128 @@ export default function App() {
               <button
                 type="button"
                 className="cancel"
-                onClick={() => setPending(null)}
+                onClick={() => {
+                  setPending(null);
+                  setQty(1);
+                }}
               >
                 Cancel
               </button>
-              <button type="button" className="confirm" onClick={confirmSale}>
+              <button
+                ref={confirmBtnRef}
+                type="button"
+                className="confirm"
+                onClick={confirmSale}
+              >
                 Yes, sold!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {guard === "tools" && (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tools-title"
+          >
+            <h3 id="tools-title">Stand tools</h3>
+            <p>Admin actions for restocking and protecting today&apos;s counts.</p>
+            <div className="tools-list">
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => {
+                  setRestockProductId("lemonade");
+                  setGuard("restock");
+                }}
+              >
+                Restock inventory
+              </button>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => void handleDownload()}
+                disabled={state.sales.length === 0}
+              >
+                Download / share sales
+              </button>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={handleRestore}
+                disabled={!canRestoreBackup}
+              >
+                Restore safety backup
+              </button>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => setGuard("undo")}
+                disabled={state.sales.length === 0}
+              >
+                Undo last sale
+              </button>
+              <button
+                type="button"
+                className="tool-btn danger"
+                onClick={() => {
+                  setResetTyped("");
+                  setGuard("reset");
+                }}
+              >
+                Reset day
+              </button>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="cancel" onClick={closeGuard}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {guard === "restock" && (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="restock-title"
+          >
+            <h3 id="restock-title">Restock</h3>
+            <p>Add 10 units back to inventory when you refill the table.</p>
+            <div className="tools-list">
+              <button
+                type="button"
+                className={`tool-btn${restockProductId === "lemonade" ? " selected" : ""}`}
+                onClick={() => setRestockProductId("lemonade")}
+              >
+                Lemonade cups (now {totals.lemonadeRemaining})
+              </button>
+              <button
+                type="button"
+                className={`tool-btn${restockProductId === "slimeBundle" ? " selected" : ""}`}
+                onClick={() => setRestockProductId("slimeBundle")}
+              >
+                Slime bundles (now {totals.slimeBundlesRemaining})
+              </button>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="cancel" onClick={closeGuard}>
+                Cancel
+              </button>
+              <button
+                ref={confirmBtnRef}
+                type="button"
+                className="confirm"
+                onClick={confirmRestock}
+              >
+                Add +10
               </button>
             </div>
           </div>
@@ -371,14 +600,19 @@ export default function App() {
           >
             <h3 id="undo-title">Undo last sale?</h3>
             <p>
-              This removes the most recent sale and puts stock back. A backup of
-              today&apos;s counts will be saved first.
+              This removes the most recent sale and puts stock back. A safety
+              backup is saved first.
             </p>
             <div className="modal-actions">
               <button type="button" className="cancel" onClick={closeGuard}>
                 Keep sale
               </button>
-              <button type="button" className="confirm" onClick={confirmUndo}>
+              <button
+                ref={confirmBtnRef}
+                type="button"
+                className="confirm"
+                onClick={confirmUndo}
+              >
                 Undo sale
               </button>
             </div>
@@ -397,8 +631,8 @@ export default function App() {
             <h3 id="reset-title">Reset the whole day?</h3>
             <p>
               This clears <strong>all sales</strong> and restores starting
-              inventory. Type <strong>{RESET_PHRASE}</strong> to unlock the
-              button. A backup is saved so you can restore if needed.
+              inventory. Type <strong>{RESET_PHRASE}</strong> to unlock. A
+              safety backup is saved so Restore can bring counts back.
             </p>
             <label className="reset-label" htmlFor="reset-confirm">
               Type {RESET_PHRASE} to confirm
@@ -417,6 +651,7 @@ export default function App() {
                 Cancel
               </button>
               <button
+                ref={confirmBtnRef}
                 type="button"
                 className="confirm danger"
                 onClick={confirmReset}
@@ -429,8 +664,8 @@ export default function App() {
         </div>
       )}
 
-      <div className={`toast${toast ? " show" : ""}`} role="status">
-        {toast?.message ?? ""}
+      <div className={`toast${toast || saveWarning ? " show" : ""}`} role="status">
+        {toast?.message ?? saveWarning ?? ""}
       </div>
     </div>
   );
