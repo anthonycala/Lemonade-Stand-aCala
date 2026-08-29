@@ -63,13 +63,20 @@ function readKey(key: string): StandState | null {
   }
 }
 
+function statesDiffer(a: StandState, b: StandState): boolean {
+  if (a.lemonadeStock !== b.lemonadeStock) return true;
+  if (a.slimeBundleStock !== b.slimeBundleStock) return true;
+  if (a.sales.length !== b.sales.length) return true;
+  if (a.sales[0]?.id !== b.sales[0]?.id) return true;
+  return false;
+}
+
 export function loadState(): StandState {
   const primary = readKey(STORAGE_KEY);
   if (primary) return primary;
 
   const backup = readKey(BACKUP_KEY);
   if (backup) {
-    // Recover counts from the safety backup instead of wiping to zero.
     saveState(backup);
     return backup;
   }
@@ -77,25 +84,43 @@ export function loadState(): StandState {
   return createInitialState();
 }
 
-export function hasBackup(): boolean {
-  return readKey(BACKUP_KEY) !== null;
+export function readBackup(): StandState | null {
+  return readKey(BACKUP_KEY);
+}
+
+/** True when backup exists and is different from the live counts. */
+export function canRestoreFromBackup(current: StandState): boolean {
+  const backup = readBackup();
+  if (!backup) return false;
+  return statesDiffer(backup, current);
 }
 
 export function saveState(state: StandState): void {
-  const payload = JSON.stringify(state);
-  localStorage.setItem(STORAGE_KEY, payload);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-/** Snapshot current counts before a destructive change (undo / reset). */
-export function snapshotBackup(state: StandState): void {
+/**
+ * Save a restore point. Skips overwriting a useful backup with an empty
+ * snapshot unless `force` is set (used right before reset/undo).
+ */
+export function snapshotBackup(
+  state: StandState,
+  options: { force?: boolean } = {}
+): void {
+  const existing = readBackup();
+  if (
+    !options.force &&
+    state.sales.length === 0 &&
+    existing &&
+    existing.sales.length > 0
+  ) {
+    return;
+  }
   localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
 }
 
 export function restoreFromBackup(): StandState | null {
-  const backup = readKey(BACKUP_KEY);
-  if (!backup) return null;
-  saveState(backup);
-  return backup;
+  return readBackup();
 }
 
 export function computeTotals(state: StandState): StandTotals {
