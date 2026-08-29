@@ -96,7 +96,7 @@ export default function App() {
         <section className="sell-panel" aria-label="Record a sale">
           <article className="product-card lemonade">
             <img
-              src="/assets/lemonade-bucket.jpg"
+              src={`${import.meta.env.BASE_URL}assets/lemonade-bucket.jpg`}
               alt="Fresh squeezed lemonade in a branded bucket"
             />
             <div className="product-body">
@@ -122,7 +122,7 @@ export default function App() {
 
           <article className="product-card slime">
             <img
-              src="/assets/slime-product.jpg"
+              src={`${import.meta.env.BASE_URL}assets/slime-product.jpg`}
               alt="Green slime jar and swirl for the slime bundle"
             />
             <div className="product-body">
