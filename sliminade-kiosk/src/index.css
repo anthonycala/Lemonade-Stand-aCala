@@ -582,6 +582,47 @@ img {
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
 }
 
+.modal-actions .confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.modal-actions .confirm.danger {
+  background: var(--pink-deep);
+}
+
+.reset-label {
+  display: block;
+  font-weight: 800;
+  font-size: 0.85rem;
+  margin: 0 0 0.4rem;
+}
+
+.reset-input {
+  width: 100%;
+  border: 2px solid rgba(42, 31, 61, 0.18);
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reset-input:focus {
+  outline: 3px solid rgba(255, 79, 163, 0.35);
+  border-color: var(--pink);
+}
+
+.safety-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+
 .footer-strip {
   margin-top: 1.25rem;
   border-radius: var(--radius);

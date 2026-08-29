@@ -5,6 +5,7 @@ import {
 } from "./business";
 
 const STORAGE_KEY = "sliminade-kiosk-v1";
+const BACKUP_KEY = "sliminade-kiosk-backup-v1";
 
 export type Sale = {
   id: string;
@@ -39,26 +40,62 @@ export function createInitialState(): StandState {
   };
 }
 
-export function loadState(): StandState {
+function isValidState(value: unknown): value is StandState {
+  if (!value || typeof value !== "object") return false;
+  const parsed = value as StandState;
+  return (
+    typeof parsed.lemonadeStock === "number" &&
+    Number.isFinite(parsed.lemonadeStock) &&
+    typeof parsed.slimeBundleStock === "number" &&
+    Number.isFinite(parsed.slimeBundleStock) &&
+    Array.isArray(parsed.sales)
+  );
+}
+
+function readKey(key: string): StandState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createInitialState();
-    const parsed = JSON.parse(raw) as StandState;
-    if (
-      typeof parsed.lemonadeStock !== "number" ||
-      typeof parsed.slimeBundleStock !== "number" ||
-      !Array.isArray(parsed.sales)
-    ) {
-      return createInitialState();
-    }
-    return parsed;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isValidState(parsed) ? parsed : null;
   } catch {
-    return createInitialState();
+    return null;
   }
 }
 
+export function loadState(): StandState {
+  const primary = readKey(STORAGE_KEY);
+  if (primary) return primary;
+
+  const backup = readKey(BACKUP_KEY);
+  if (backup) {
+    // Recover counts from the safety backup instead of wiping to zero.
+    saveState(backup);
+    return backup;
+  }
+
+  return createInitialState();
+}
+
+export function hasBackup(): boolean {
+  return readKey(BACKUP_KEY) !== null;
+}
+
 export function saveState(state: StandState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const payload = JSON.stringify(state);
+  localStorage.setItem(STORAGE_KEY, payload);
+}
+
+/** Snapshot current counts before a destructive change (undo / reset). */
+export function snapshotBackup(state: StandState): void {
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
+}
+
+export function restoreFromBackup(): StandState | null {
+  const backup = readKey(BACKUP_KEY);
+  if (!backup) return null;
+  saveState(backup);
+  return backup;
 }
 
 export function computeTotals(state: StandState): StandTotals {
@@ -140,4 +177,26 @@ export function undoLastSale(state: StandState): StandState {
     slimeBundleStock: state.slimeBundleStock + last.qty,
     sales: rest,
   };
+}
+
+export function salesToCsv(state: StandState): string {
+  const header = "time,product,qty,amount";
+  const rows = state.sales.map((sale) => {
+    const product =
+      sale.productId === "lemonade" ? "lemonade" : "slime_bundle";
+    return `${sale.at},${product},${sale.qty},${sale.amount.toFixed(2)}`;
+  });
+  return [header, ...rows].join("\n");
+}
+
+export function downloadSalesCsv(state: StandState): void {
+  const csv = salesToCsv(state);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `sliminade-sales-${stamp}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }

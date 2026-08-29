@@ -11,10 +11,25 @@ import { useStandStore } from "./lib/useStandStore";
 import "./index.css";
 
 type PendingSale = ProductId | null;
+type GuardDialog = "undo" | "reset" | null;
+
+const RESET_PHRASE = "RESET";
 
 export default function App() {
-  const { state, totals, sell, undo, reset, canSellProduct } = useStandStore();
+  const {
+    state,
+    totals,
+    sell,
+    undo,
+    reset,
+    restoreBackup,
+    downloadSales,
+    canRestoreBackup,
+    canSellProduct,
+  } = useStandStore();
   const [pending, setPending] = useState<PendingSale>(null);
+  const [guard, setGuard] = useState<GuardDialog>(null);
+  const [resetTyped, setResetTyped] = useState("");
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null
   );
@@ -28,7 +43,7 @@ export default function App() {
     toastTimers.current.push(
       window.setTimeout(() => {
         setToast((current) => (current?.id === id ? null : current));
-      }, 2000)
+      }, 2200)
     );
   }
 
@@ -54,18 +69,44 @@ export default function App() {
     }
   }
 
-  function handleReset() {
-    if (
-      window.confirm(
-        "Reset the stand day? This clears all sales and restores starting inventory."
-      )
-    ) {
-      reset();
-      flash("Stand reset to starting inventory");
+  function closeGuard() {
+    setGuard(null);
+    setResetTyped("");
+  }
+
+  function confirmUndo() {
+    undo();
+    closeGuard();
+    flash("Last sale undone — previous counts saved in backup");
+  }
+
+  function confirmReset() {
+    if (resetTyped.trim().toUpperCase() !== RESET_PHRASE) return;
+    reset();
+    closeGuard();
+    flash("Day reset — use Restore backup if that was a mistake");
+  }
+
+  function handleRestore() {
+    const ok = restoreBackup();
+    flash(
+      ok
+        ? "Restored previous sales and inventory from backup"
+        : "No backup found to restore"
+    );
+  }
+
+  function handleDownload() {
+    if (state.sales.length === 0) {
+      flash("No sales to download yet");
+      return;
     }
+    downloadSales();
+    flash("Sales log downloaded");
   }
 
   const pendingProduct = pending ? PRODUCTS[pending] : null;
+  const resetReady = resetTyped.trim().toUpperCase() === RESET_PHRASE;
 
   return (
     <div className="app">
@@ -81,12 +122,35 @@ export default function App() {
           <button
             type="button"
             className="ghost-btn"
-            onClick={undo}
+            onClick={handleDownload}
+            disabled={state.sales.length === 0}
+          >
+            Download sales
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={handleRestore}
+            disabled={!canRestoreBackup}
+          >
+            Restore backup
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => setGuard("undo")}
             disabled={state.sales.length === 0}
           >
             Undo last sale
           </button>
-          <button type="button" className="ghost-btn danger" onClick={handleReset}>
+          <button
+            type="button"
+            className="ghost-btn danger"
+            onClick={() => {
+              setResetTyped("");
+              setGuard("reset");
+            }}
+          >
             Reset day
           </button>
         </div>
@@ -194,6 +258,10 @@ export default function App() {
                 />
               </div>
             </div>
+            <p className="safety-hint">
+              Counts are saved on this device. Reset requires typing RESET, and
+              a backup is kept so you can restore.
+            </p>
           </section>
 
           <section className="panel" aria-label="Hard costs">
@@ -277,6 +345,74 @@ export default function App() {
               </button>
               <button type="button" className="confirm" onClick={confirmSale}>
                 Yes, sold!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {guard === "undo" && (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="undo-title"
+          >
+            <h3 id="undo-title">Undo last sale?</h3>
+            <p>
+              This removes the most recent sale and puts stock back. A backup of
+              today&apos;s counts will be saved first.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="cancel" onClick={closeGuard}>
+                Keep sale
+              </button>
+              <button type="button" className="confirm" onClick={confirmUndo}>
+                Undo sale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {guard === "reset" && (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-title"
+          >
+            <h3 id="reset-title">Reset the whole day?</h3>
+            <p>
+              This clears <strong>all sales</strong> and restores starting
+              inventory. Type <strong>{RESET_PHRASE}</strong> to unlock the
+              button. A backup is saved so you can restore if needed.
+            </p>
+            <label className="reset-label" htmlFor="reset-confirm">
+              Type {RESET_PHRASE} to confirm
+            </label>
+            <input
+              id="reset-confirm"
+              className="reset-input"
+              value={resetTyped}
+              onChange={(event) => setResetTyped(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={RESET_PHRASE}
+            />
+            <div className="modal-actions">
+              <button type="button" className="cancel" onClick={closeGuard}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm danger"
+                onClick={confirmReset}
+                disabled={!resetReady}
+              >
+                Reset day
               </button>
             </div>
           </div>

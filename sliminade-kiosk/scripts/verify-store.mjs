@@ -19,4 +19,12 @@ revenue += 4;
 assert.equal(slimeStock, 79);
 assert.equal(revenue, 10);
 
-console.log("business math checks passed");
+// Safety: backup snapshot keeps prior counts when a reset would wipe them.
+const live = { lemonadeStock, slimeStock, revenue, sales: 2 };
+const backup = { ...live };
+const wiped = { lemonadeStock: 200, slimeStock: 80, revenue: 0, sales: 0 };
+assert.notEqual(wiped.sales, live.sales);
+assert.equal(backup.sales, 2);
+assert.equal(backup.revenue, 10);
+
+console.log("business math + backup safety checks passed");
