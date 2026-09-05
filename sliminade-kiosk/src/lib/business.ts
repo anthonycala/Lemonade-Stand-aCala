@@ -33,6 +33,24 @@ export const HARD_COSTS = [
 
 export const TOTAL_HARD_COSTS = HARD_COSTS.reduce((sum, row) => sum + row.amount, 0);
 
+/** Projected profit if everything sells (business plan). */
+export const PROFIT_GOAL = 1110.5;
+export const REVENUE_GOAL = 1520;
+
+export const DEFAULT_LOW_STOCK = {
+  lemonade: 20,
+  slimeBundle: 10,
+} as const;
+
+export const CHECKLIST_ITEMS = [
+  { id: "inventory", label: "Count lemonade cups and slime bundles" },
+  { id: "cash", label: "Set starting cash / change box" },
+  { id: "battery", label: "Phone/tablet charged or plugged in" },
+  { id: "network", label: "Open the kiosk site once while online" },
+  { id: "backup", label: "Download a sales backup if continuing a day" },
+  { id: "warning", label: "Post the slime not-edible safety reminder" },
+] as const;
+
 export const BRAND = {
   name: "Nayeli's Sliminade Stand",
   tagline: "Fresh Lemonade • Cool Slime • Good Vibes",
