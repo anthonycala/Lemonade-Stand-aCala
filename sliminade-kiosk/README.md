@@ -9,7 +9,7 @@ Tablet-friendly point-of-sale kiosk for the stand. Tap to record lemonade and sl
 | Fresh Lemonade | $6 each | 200 cups |
 | Slime Bundle | $4 (3 slimes) | 80 bundles |
 
-Starting hard costs total **$409.50**. The kiosk shows progress toward earning that back.
+Starting hard costs total **$409.50**. Profit goal from the plan: **$1,110.50**.
 
 ## Run locally
 
@@ -19,28 +19,24 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173`). Sales persist in the browser via `localStorage`.
-
-## Website / GitHub Pages
+## Live site
 
 **https://anthonycala.github.io/Lemonade-Stand-aCala/**
 
-On a phone: Safari → Share → **Add to Home Screen** for a full-screen kiosk icon.
+On iPhone: Safari → Share → **Add to Home Screen** (works offline after the first visit).
 
-### How to test on the site
+## Stand tools
 
-1. Tap **Tap to sell**, set quantity if needed, confirm
-2. Open **Stand tools** → Restock / Undo / Restore / Download / Reset
-3. Reset requires typing `RESET`; Restore brings back the safety backup from Undo/Reset
-4. Check hard-cost recovery vs $409.50
+- Quantity sales (1–5), restock +10
+- Full sales history + filters
+- Multiple restore points (Undo/Reset/Restock/Closeout)
+- Cash closeout (starting cash + revenue vs counted cash)
+- Pre-event checklist
+- Settings: event name, starting cash, low-stock thresholds
+- Download/share CSV (sales + inventory + audit)
+- Kiosk lock PIN: `1234`
+- Day reset requires typing `RESET`
 
-### Tips for event day
+## Linear project
 
-- Use **one device** as the register (tabs sync only if they share the same browser storage)
-- Download/share the sales CSV at lunch and end of day
-- Leave private browsing off so counts can save
-- Safety backup is created on Undo/Reset and is **not** overwritten by later sales
-
-## Stack
-
-Vite + React + TypeScript. Brand art lives in `public/assets/`.
+https://linear.app/sliminade-kiosk-stand/project/sliminade-kiosk-enhancements-de59a5f1ea71

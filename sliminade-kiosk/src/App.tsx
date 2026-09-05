@@ -94,13 +94,15 @@ export default function App() {
     null
   );
   const toastTimers = useRef<number[]>([]);
+  const toastSeq = useRef(0);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
   const pinInputRef = useRef<HTMLInputElement>(null);
 
   function flash(message: string) {
     toastTimers.current.forEach((id) => window.clearTimeout(id));
     toastTimers.current = [];
-    const id = Date.now();
+    toastSeq.current += 1;
+    const id = toastSeq.current;
     setToast({ id, message });
     toastTimers.current.push(
       window.setTimeout(() => {
