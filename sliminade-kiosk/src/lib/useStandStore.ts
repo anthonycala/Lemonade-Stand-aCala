@@ -21,7 +21,6 @@ import {
   type RestorePoint,
   type StandSettings,
   type StandState,
-  type StandTotals,
 } from "./store";
 import type { ProductId } from "./business";
 
