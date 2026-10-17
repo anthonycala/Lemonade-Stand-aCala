@@ -12,7 +12,6 @@ let slimeStock = 80;
 let revenue = 0;
 let sales = 0;
 let lemonadePrice = 6;
-let slimeBundlePrice = 4;
 
 function sellLemonade(qty) {
   lemonadeStock -= qty;
