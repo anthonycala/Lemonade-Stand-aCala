@@ -500,6 +500,49 @@ img {
   transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.inventory-group {
+  margin-top: 0.75rem;
+}
+
+.inventory-group h4,
+.restock-heading {
+  margin: 0.65rem 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+}
+
+.inventory-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.inventory-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 244, 214, 0.55);
+}
+
+.inventory-list .item {
+  font-weight: 700;
+}
+
+.inventory-list .details {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
 .cost-list {
   list-style: none;
   margin: 0;

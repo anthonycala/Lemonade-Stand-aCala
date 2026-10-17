@@ -1,9 +1,15 @@
 import {
   CHECKLIST_ITEMS,
   DEFAULT_LOW_STOCK,
+  INVENTORY_IDS,
+  INVENTORY_ITEMS,
   PRODUCTS,
   PROFIT_GOAL,
   TOTAL_HARD_COSTS,
+  createStartingInventory,
+  usageForSale,
+  type InventoryId,
+  type InventoryStock,
   type ProductId,
 } from "./business";
 
@@ -38,6 +44,7 @@ export type CloseoutRecord = {
 export type StandState = {
   lemonadeStock: number;
   slimeBundleStock: number;
+  inventory: InventoryStock;
   sales: Sale[];
   auditLog: AuditEntry[];
   closeout: CloseoutRecord | null;
@@ -78,6 +85,8 @@ export type StandTotals = {
   lemonadeRemaining: number;
   slimeBundlesRemaining: number;
   expectedCash: number;
+  inventory: InventoryStock;
+  lowInventoryIds: InventoryId[];
 };
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -86,10 +95,49 @@ export function createInitialState(): StandState {
   return {
     lemonadeStock: PRODUCTS.lemonade.startingStock,
     slimeBundleStock: PRODUCTS.slimeBundle.startingStock,
+    inventory: createStartingInventory(),
     sales: [],
     auditLog: [],
     closeout: null,
   };
+}
+
+function sanitizeInventory(value: unknown): InventoryStock {
+  const defaults = createStartingInventory();
+  if (!value || typeof value !== "object") return defaults;
+  const raw = value as Partial<Record<InventoryId, unknown>>;
+  const next = { ...defaults };
+  for (const id of INVENTORY_IDS) {
+    const amount = raw[id];
+    if (typeof amount === "number" && Number.isFinite(amount)) {
+      next[id] = Math.max(0, Math.floor(amount));
+    }
+  }
+  return next;
+}
+
+function applyInventoryDelta(
+  inventory: InventoryStock,
+  usage: Partial<Record<InventoryId, number>>,
+  direction: 1 | -1
+): InventoryStock {
+  const next = { ...inventory };
+  for (const [id, amount] of Object.entries(usage) as [InventoryId, number][]) {
+    next[id] = Math.max(0, next[id] + direction * amount);
+  }
+  return next;
+}
+
+export function hasInventoryForSale(
+  state: StandState,
+  productId: ProductId,
+  qty: number
+): boolean {
+  const usage = usageForSale(productId, Math.floor(qty));
+  for (const [id, amount] of Object.entries(usage) as [InventoryId, number][]) {
+    if ((state.inventory[id] ?? 0) < amount) return false;
+  }
+  return true;
 }
 
 export function createDefaultSettings(): StandSettings {
@@ -164,6 +212,7 @@ function sanitizeState(value: unknown): StandState | null {
   return {
     lemonadeStock: Math.max(0, Math.floor(raw.lemonadeStock)),
     slimeBundleStock: Math.max(0, Math.floor(raw.slimeBundleStock)),
+    inventory: sanitizeInventory(raw.inventory),
     sales: raw.sales.filter(isValidSale),
     auditLog: Array.isArray(raw.auditLog) ? raw.auditLog.filter(isValidAudit) : [],
     closeout:
@@ -241,9 +290,17 @@ function readJson(key: string): unknown | null {
   }
 }
 
+function inventoryDiffers(a: InventoryStock, b: InventoryStock): boolean {
+  for (const id of INVENTORY_IDS) {
+    if (a[id] !== b[id]) return true;
+  }
+  return false;
+}
+
 function statesDiffer(a: StandState, b: StandState): boolean {
   if (a.lemonadeStock !== b.lemonadeStock) return true;
   if (a.slimeBundleStock !== b.slimeBundleStock) return true;
+  if (inventoryDiffers(a.inventory, b.inventory)) return true;
   if (a.sales.length !== b.sales.length) return true;
   if (a.sales[0]?.id !== b.sales[0]?.id) return true;
   return false;
@@ -378,6 +435,12 @@ export function computeTotals(
     Math.max(0, (Math.max(0, profit) / PROFIT_GOAL) * 100)
   );
 
+  const lowInventoryIds = INVENTORY_IDS.filter((id) => {
+    const item = INVENTORY_ITEMS[id];
+    const current = state.inventory[id] ?? 0;
+    return current > 0 && current <= item.reorderAt;
+  });
+
   return {
     lemonadeSold,
     slimeBundlesSold,
@@ -390,6 +453,8 @@ export function computeTotals(
     lemonadeRemaining: state.lemonadeStock,
     slimeBundlesRemaining: state.slimeBundleStock,
     expectedCash: settings.startingCash + revenue,
+    inventory: state.inventory,
+    lowInventoryIds,
   };
 }
 
@@ -404,7 +469,11 @@ export function canSell(
   productId: ProductId,
   qty = 1
 ): boolean {
-  return stockFor(state, productId) >= qty && qty >= 1;
+  return (
+    qty >= 1 &&
+    stockFor(state, productId) >= qty &&
+    hasInventoryForSale(state, productId, qty)
+  );
 }
 
 export function recordSale(
@@ -417,6 +486,7 @@ export function recordSale(
   if (!canSell(state, productId, count)) return state;
 
   const unitPrice = productPrice(productId, settings);
+  const usage = usageForSale(productId, count);
   const sale: Sale = {
     id: makeId(),
     productId,
@@ -430,12 +500,14 @@ export function recordSale(
       ? {
           ...state,
           lemonadeStock: state.lemonadeStock - count,
+          inventory: applyInventoryDelta(state.inventory, usage, -1),
           sales: [sale, ...state.sales],
           closeout: null,
         }
       : {
           ...state,
           slimeBundleStock: state.slimeBundleStock - count,
+          inventory: applyInventoryDelta(state.inventory, usage, -1),
           sales: [sale, ...state.sales],
           closeout: null,
         };
@@ -455,15 +527,48 @@ export function restock(
   const count = Math.floor(qty);
   if (count <= 0) return state;
 
+  const usage = usageForSale(productId, count);
   const next =
     productId === "lemonade"
-      ? { ...state, lemonadeStock: state.lemonadeStock + count }
-      : { ...state, slimeBundleStock: state.slimeBundleStock + count };
+      ? {
+          ...state,
+          lemonadeStock: state.lemonadeStock + count,
+          inventory: applyInventoryDelta(state.inventory, usage, 1),
+        }
+      : {
+          ...state,
+          slimeBundleStock: state.slimeBundleStock + count,
+          inventory: applyInventoryDelta(state.inventory, usage, 1),
+        };
 
   return pushAudit(
     next,
     "restock",
-    `Restocked +${count} ${productId === "lemonade" ? "lemonade cups" : "slime bundles"}`
+    `Restocked +${count} ${productId === "lemonade" ? "lemonade cups" : "slime bundles"} (+ matching supplies)`
+  );
+}
+
+export function restockInventoryItem(
+  state: StandState,
+  itemId: InventoryId,
+  qty: number
+): StandState {
+  const count = Math.floor(qty);
+  if (count <= 0) return state;
+  if (!INVENTORY_ITEMS[itemId]) return state;
+
+  const next: StandState = {
+    ...state,
+    inventory: {
+      ...state.inventory,
+      [itemId]: state.inventory[itemId] + count,
+    },
+  };
+
+  return pushAudit(
+    next,
+    "restock",
+    `Restocked +${count} ${INVENTORY_ITEMS[itemId].name}`
   );
 }
 
@@ -471,17 +576,20 @@ export function undoLastSale(state: StandState): StandState {
   const [last, ...rest] = state.sales;
   if (!last) return state;
 
+  const usage = usageForSale(last.productId, last.qty);
   const next =
     last.productId === "lemonade"
       ? {
           ...state,
           lemonadeStock: state.lemonadeStock + last.qty,
+          inventory: applyInventoryDelta(state.inventory, usage, 1),
           sales: rest,
           closeout: null,
         }
       : {
           ...state,
           slimeBundleStock: state.slimeBundleStock + last.qty,
+          inventory: applyInventoryDelta(state.inventory, usage, 1),
           sales: rest,
           closeout: null,
         };
@@ -537,6 +645,13 @@ export function standExportCsv(
           `summary,cash_difference,${state.closeout.difference.toFixed(2)}`,
         ]
       : []),
+    "",
+    "inventory,item,category,unit,starting,current,reorder_at",
+    ...INVENTORY_IDS.map((id) => {
+      const item = INVENTORY_ITEMS[id];
+      const current = state.inventory[id] ?? 0;
+      return `inventory,${item.name},${item.category},${item.unit},${item.startingStock},${current},${item.reorderAt}`;
+    }),
     "",
     "time,product,qty,amount",
     ...state.sales.map((sale) => {

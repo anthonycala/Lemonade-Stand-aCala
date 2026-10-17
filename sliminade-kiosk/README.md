@@ -25,15 +25,19 @@ npm run dev
 
 On iPhone: Safari → Share → **Add to Home Screen** (works offline after the first visit).
 
+## Individual inventory
+
+Sales also decrement supply pieces (cups, lids, straws, lemons, sugar/water/ice portions, slime containers, glue/activator/coloring/glitter, napkins, stickers). Light-up cups and spider straws are tracked for specialty drinks. CSV exports include a full inventory section.
+
 ## Stand tools
 
-- Quantity sales (1–5), restock +10
+- Quantity sales (1–5), restock finished goods or individual supplies (+10)
 - Full sales history + filters
 - Multiple restore points (Undo/Reset/Restock/Closeout)
 - Cash closeout (starting cash + revenue vs counted cash)
 - Pre-event checklist
 - Settings: event name, product prices, starting cash, low-stock thresholds
-- Download/share CSV (sales + inventory + audit)
+- Download/share CSV (sales + individual inventory + audit)
 - Kiosk lock PIN: `1234`
 - Day reset requires typing `RESET`
 

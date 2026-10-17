@@ -21,6 +21,205 @@ export const PRODUCTS = {
 
 export type ProductId = keyof typeof PRODUCTS;
 
+/**
+ * Individual supply inventory (from stand inventory tracker).
+ * Starting stocks match the business-plan capacity for lemonade (200)
+ * and slime (240 individual tubs / 80 bundles).
+ */
+export const INVENTORY_ITEMS = {
+  cups: {
+    id: "cups" as const,
+    name: "Cups",
+    category: "serving" as const,
+    unit: "each",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  lids: {
+    id: "lids" as const,
+    name: "Lids",
+    category: "serving" as const,
+    unit: "each",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  straws: {
+    id: "straws" as const,
+    name: "Straws",
+    category: "serving" as const,
+    unit: "each",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  lightUpCups: {
+    id: "lightUpCups" as const,
+    name: "Light-up cups",
+    category: "serving" as const,
+    unit: "each",
+    startingStock: 50,
+    reorderAt: 5,
+  },
+  spiderStraws: {
+    id: "spiderStraws" as const,
+    name: "Spider straws",
+    category: "serving" as const,
+    unit: "each",
+    startingStock: 50,
+    reorderAt: 5,
+  },
+  lemons: {
+    id: "lemons" as const,
+    name: "Lemons",
+    category: "ingredients" as const,
+    unit: "each",
+    startingStock: 100,
+    reorderAt: 20,
+  },
+  sugar: {
+    id: "sugar" as const,
+    name: "Sugar portions",
+    category: "ingredients" as const,
+    unit: "portion",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  water: {
+    id: "water" as const,
+    name: "Water portions",
+    category: "ingredients" as const,
+    unit: "portion",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  ice: {
+    id: "ice" as const,
+    name: "Ice portions",
+    category: "ingredients" as const,
+    unit: "portion",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  glue: {
+    id: "glue" as const,
+    name: "Glue portions",
+    category: "slime" as const,
+    unit: "portion",
+    startingStock: 240,
+    reorderAt: 24,
+  },
+  activator: {
+    id: "activator" as const,
+    name: "Activator portions",
+    category: "slime" as const,
+    unit: "portion",
+    startingStock: 240,
+    reorderAt: 24,
+  },
+  foodColoring: {
+    id: "foodColoring" as const,
+    name: "Food coloring",
+    category: "slime" as const,
+    unit: "portion",
+    startingStock: 240,
+    reorderAt: 24,
+  },
+  glitter: {
+    id: "glitter" as const,
+    name: "Glitter / mix-ins",
+    category: "slime" as const,
+    unit: "portion",
+    startingStock: 240,
+    reorderAt: 24,
+  },
+  slimeContainers: {
+    id: "slimeContainers" as const,
+    name: "Slime containers",
+    category: "slime" as const,
+    unit: "each",
+    startingStock: 240,
+    reorderAt: 24,
+  },
+  napkins: {
+    id: "napkins" as const,
+    name: "Napkins",
+    category: "packaging" as const,
+    unit: "each",
+    startingStock: 200,
+    reorderAt: 20,
+  },
+  stickers: {
+    id: "stickers" as const,
+    name: "Labels / stickers",
+    category: "packaging" as const,
+    unit: "each",
+    startingStock: 300,
+    reorderAt: 30,
+  },
+} as const;
+
+export type InventoryId = keyof typeof INVENTORY_ITEMS;
+export type InventoryCategory = (typeof INVENTORY_ITEMS)[InventoryId]["category"];
+
+export type InventoryStock = Record<InventoryId, number>;
+
+export const INVENTORY_IDS = Object.keys(INVENTORY_ITEMS) as InventoryId[];
+
+export const INVENTORY_CATEGORIES: {
+  id: InventoryCategory;
+  label: string;
+}[] = [
+  { id: "serving", label: "Serving" },
+  { id: "ingredients", label: "Ingredients" },
+  { id: "slime", label: "Slime supplies" },
+  { id: "packaging", label: "Packaging" },
+];
+
+/** Components used per product sale quantity (1 lemonade cup or 1 slime bundle). */
+export const PRODUCT_USAGE: Record<
+  ProductId,
+  Partial<Record<InventoryId, number>>
+> = {
+  lemonade: {
+    cups: 1,
+    lids: 1,
+    straws: 1,
+    lemons: 1,
+    sugar: 1,
+    water: 1,
+    ice: 1,
+    napkins: 1,
+  },
+  slimeBundle: {
+    // Bundle = 3 individual slimes
+    glue: 3,
+    activator: 3,
+    foodColoring: 3,
+    glitter: 3,
+    slimeContainers: 3,
+    stickers: 3,
+  },
+};
+
+export function createStartingInventory(): InventoryStock {
+  const stock = {} as InventoryStock;
+  for (const id of INVENTORY_IDS) {
+    stock[id] = INVENTORY_ITEMS[id].startingStock;
+  }
+  return stock;
+}
+
+export function usageForSale(
+  productId: ProductId,
+  qty: number
+): Partial<Record<InventoryId, number>> {
+  const base = PRODUCT_USAGE[productId];
+  const scaled: Partial<Record<InventoryId, number>> = {};
+  for (const [id, amount] of Object.entries(base) as [InventoryId, number][]) {
+    scaled[id] = amount * qty;
+  }
+  return scaled;
+}
+
 export const HARD_COSTS = [
   { item: "Lemons", details: "2 cases", amount: 110.0, category: "products" as const },
   { item: "Sugar", details: "3 bags @ $7.98", amount: 23.94, category: "products" as const },
@@ -43,7 +242,7 @@ export const DEFAULT_LOW_STOCK = {
 } as const;
 
 export const CHECKLIST_ITEMS = [
-  { id: "inventory", label: "Count lemonade cups and slime bundles" },
+  { id: "inventory", label: "Count finished goods and supply inventory" },
   { id: "cash", label: "Set starting cash / change box" },
   { id: "battery", label: "Phone/tablet charged or plugged in" },
   { id: "network", label: "Open the kiosk site once while online" },

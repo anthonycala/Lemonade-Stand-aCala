@@ -3,15 +3,23 @@ import {
   BRAND,
   CHECKLIST_ITEMS,
   HARD_COSTS,
+  INVENTORY_CATEGORIES,
+  INVENTORY_IDS,
+  INVENTORY_ITEMS,
   PRODUCTS,
   PROFIT_GOAL,
   TOTAL_HARD_COSTS,
   formatMoney,
+  type InventoryId,
   type ProductId,
 } from "./lib/business";
 import { productPrice } from "./lib/store";
 import { useStandStore } from "./lib/useStandStore";
 import "./index.css";
+
+type RestockTarget =
+  | { kind: "product"; id: ProductId }
+  | { kind: "supply"; id: InventoryId };
 
 type PendingSale = ProductId | null;
 type Modal =
@@ -63,6 +71,7 @@ export default function App() {
     saveWarning,
     sell,
     restockProduct,
+    restockSupply,
     undo,
     reset,
     restoreBackup,
@@ -79,8 +88,10 @@ export default function App() {
   const [pending, setPending] = useState<PendingSale>(null);
   const [qty, setQty] = useState(1);
   const [modal, setModal] = useState<Modal>(null);
-  const [restockProductId, setRestockProductId] =
-    useState<ProductId>("lemonade");
+  const [restockTarget, setRestockTarget] = useState<RestockTarget>({
+    kind: "product",
+    id: "lemonade",
+  });
   const [resetTyped, setResetTyped] = useState("");
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [pinDigits, setPinDigits] = useState("");
@@ -239,15 +250,18 @@ export default function App() {
   }
 
   function confirmRestock() {
-    const ok = restockProduct(restockProductId, 10);
+    const ok =
+      restockTarget.kind === "product"
+        ? restockProduct(restockTarget.id, 10)
+        : restockSupply(restockTarget.id, 10);
     closeModal();
-    flash(
-      ok
-        ? restockProductId === "lemonade"
-          ? "Restocked +10 lemonade cups"
-          : "Restocked +10 slime bundles"
-        : "Couldn’t restock"
-    );
+    const label =
+      restockTarget.kind === "product"
+        ? restockTarget.id === "lemonade"
+          ? "lemonade cups (+ supplies)"
+          : "slime bundles (+ supplies)"
+        : INVENTORY_ITEMS[restockTarget.id].name;
+    flash(ok ? `Restocked +10 ${label}` : "Couldn’t restock");
   }
 
   function handleRestore(pointId?: string) {
@@ -565,6 +579,47 @@ export default function App() {
 
           {!locked && (
             <>
+              <section className="panel" aria-label="Individual inventory">
+                <h3>Individual inventory</h3>
+                <p className="safety-hint" style={{ marginTop: 0 }}>
+                  Cups, lids, ingredients, and slime supplies drop with each
+                  sale. Restock from Stand tools.
+                </p>
+                {INVENTORY_CATEGORIES.map((category) => {
+                  const rows = INVENTORY_IDS.filter(
+                    (id) => INVENTORY_ITEMS[id].category === category.id
+                  );
+                  return (
+                    <div key={category.id} className="inventory-group">
+                      <h4>{category.label}</h4>
+                      <ul className="inventory-list">
+                        {rows.map((id) => {
+                          const item = INVENTORY_ITEMS[id];
+                          const current = totals.inventory[id] ?? 0;
+                          const low = totals.lowInventoryIds.includes(id);
+                          const empty = current === 0;
+                          return (
+                            <li key={id}>
+                              <div>
+                                <span className="item">{item.name}</span>
+                                <span className="details">
+                                  of {item.startingStock} {item.unit}
+                                </span>
+                              </div>
+                              <span
+                                className={`stock-chip${low ? " low" : ""}${empty ? " empty" : ""}`}
+                              >
+                                {empty ? "Out" : current}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </section>
+
               <section className="panel" aria-label="Hard costs">
                 <h3>Starting hard costs</h3>
                 <ul className="cost-list">
@@ -764,7 +819,7 @@ export default function App() {
                 type="button"
                 className="tool-btn"
                 onClick={() => {
-                  setRestockProductId("lemonade");
+                  setRestockTarget({ kind: "product", id: "lemonade" });
                   setModal("restock");
                 }}
               >
@@ -883,25 +938,74 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="restock-title"
+            style={{ maxHeight: "90vh", overflow: "auto" }}
           >
             <h3 id="restock-title">Restock</h3>
-            <p>Add 10 units back to inventory when you refill the table.</p>
+            <p>
+              Add 10 finished goods (with matching supplies) or restock one
+              supply item.
+            </p>
+            <h4 className="restock-heading">Finished goods</h4>
             <div className="tools-list">
               <button
                 type="button"
-                className={`tool-btn${restockProductId === "lemonade" ? " selected" : ""}`}
-                onClick={() => setRestockProductId("lemonade")}
+                className={`tool-btn${
+                  restockTarget.kind === "product" &&
+                  restockTarget.id === "lemonade"
+                    ? " selected"
+                    : ""
+                }`}
+                onClick={() =>
+                  setRestockTarget({ kind: "product", id: "lemonade" })
+                }
               >
                 Lemonade cups (now {totals.lemonadeRemaining})
               </button>
               <button
                 type="button"
-                className={`tool-btn${restockProductId === "slimeBundle" ? " selected" : ""}`}
-                onClick={() => setRestockProductId("slimeBundle")}
+                className={`tool-btn${
+                  restockTarget.kind === "product" &&
+                  restockTarget.id === "slimeBundle"
+                    ? " selected"
+                    : ""
+                }`}
+                onClick={() =>
+                  setRestockTarget({ kind: "product", id: "slimeBundle" })
+                }
               >
                 Slime bundles (now {totals.slimeBundlesRemaining})
               </button>
             </div>
+            {INVENTORY_CATEGORIES.map((category) => {
+              const rows = INVENTORY_IDS.filter(
+                (id) => INVENTORY_ITEMS[id].category === category.id
+              );
+              return (
+                <div key={category.id}>
+                  <h4 className="restock-heading">{category.label}</h4>
+                  <div className="tools-list">
+                    {rows.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`tool-btn${
+                          restockTarget.kind === "supply" &&
+                          restockTarget.id === id
+                            ? " selected"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setRestockTarget({ kind: "supply", id })
+                        }
+                      >
+                        {INVENTORY_ITEMS[id].name} (now{" "}
+                        {totals.inventory[id] ?? 0})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
             <div className="modal-actions">
               <button
                 type="button"

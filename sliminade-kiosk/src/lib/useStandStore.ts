@@ -13,6 +13,7 @@ import {
   recordCloseout,
   recordSale,
   restock,
+  restockInventoryItem,
   saveSettings,
   saveState,
   snapshotSafetyBackup,
@@ -22,7 +23,7 @@ import {
   type StandSettings,
   type StandState,
 } from "./store";
-import type { ProductId } from "./business";
+import type { InventoryId, ProductId } from "./business";
 
 type Listener = () => void;
 
@@ -191,6 +192,13 @@ export function useStandStore() {
       if (qty <= 0) return false;
       snapshotSafetyBackup(current, "restock", "Before restock");
       setState(restock(current, productId, qty));
+      return true;
+    },
+    restockSupply: (itemId: InventoryId, qty: number) => {
+      const current = getLiveState();
+      if (qty <= 0) return false;
+      snapshotSafetyBackup(current, "restock", "Before supply restock");
+      setState(restockInventoryItem(current, itemId, qty));
       return true;
     },
     undo: () => {
