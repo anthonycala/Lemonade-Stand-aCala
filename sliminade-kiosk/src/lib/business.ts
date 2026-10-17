@@ -7,10 +7,11 @@ export const PRODUCTS = {
     unitLabel: "cup",
     price: 6,
     startingStock: 200,
-    image: "assets/spooky-lemonade-menu.jpg",
-    imageAlt: "Fresh squeezed lemonade in a 24 oz cup",
+    image: "assets/lemonade-cup.jpg",
+    imageAlt: "Fresh squeezed lemonade in a clear cup with ice and lemon",
     cardClass: "lemonade",
     priceLabel: "each" as const,
+    description: "Fresh squeezed lemonade in a 24 oz cup with ice.",
   },
   passionFruit: {
     id: "passionFruit" as const,
@@ -18,10 +19,12 @@ export const PRODUCTS = {
     unitLabel: "cup",
     price: 8,
     startingStock: 50,
-    image: "assets/spooky-lemonade-menu.jpg",
+    image: "assets/passion-fruit-cup.jpg",
     imageAlt: "Passion fruit lemonade in a light-up cup with spider ring",
     cardClass: "passion",
     priceLabel: "each" as const,
+    description:
+      "Fresh squeezed passion fruit lemonade. Includes spider ring + light-up cup!",
     includes: "Includes spider ring + light-up cup!",
     safetyWarning: "Spider ring and light are not edible.",
   },
@@ -32,10 +35,13 @@ export const PRODUCTS = {
     price: 5,
     unitsPerSale: 3,
     startingStock: 80, // 240 slimes ÷ 3
-    image: "assets/slime-charms-menu.jpg",
-    imageAlt: "Three glow-in-the-dark slime tubs with free Halloween charms",
+    image: "assets/slime-product.jpg",
+    imageAlt:
+      "Slime bundle of three colorful slime tubs — green, pink, and blue",
     cardClass: "slime",
     priceLabel: "bundle" as const,
+    description:
+      "3 glow-in-the-dark slimes for $5, plus 3 free Halloween charms.",
     includes: "+ 3 free charms with every 3-slime purchase",
     safetyWarning: "DO NOT EAT — Slime and charms are not edible.",
   },
@@ -45,12 +51,37 @@ export type ProductId = keyof typeof PRODUCTS;
 export const PRODUCT_IDS = Object.keys(PRODUCTS) as ProductId[];
 export type ProductStock = Record<ProductId, number>;
 
+/** Editable catalog fields stored in settings (images as data URLs). */
+export type ProductCatalogEntry = {
+  description: string;
+  /** Custom image as a data URL; null/empty uses the default asset. */
+  imageDataUrl: string | null;
+};
+
+export type ProductCatalog = Record<ProductId, ProductCatalogEntry>;
+
+export function createDefaultProductCatalog(): ProductCatalog {
+  const catalog = {} as ProductCatalog;
+  for (const id of PRODUCT_IDS) {
+    catalog[id] = {
+      description: PRODUCTS[id].description,
+      imageDataUrl: null,
+    };
+  }
+  return catalog;
+}
+
 export function createStartingProductStock(): ProductStock {
   const stock = {} as ProductStock;
   for (const id of PRODUCT_IDS) {
     stock[id] = PRODUCTS[id].startingStock;
   }
   return stock;
+}
+
+export function defaultProductImageSrc(productId: ProductId): string {
+  const base = import.meta.env.BASE_URL || "/";
+  return `${base}${PRODUCTS[productId].image}`;
 }
 
 export function productDisplayName(productId: ProductId, qty = 1): string {

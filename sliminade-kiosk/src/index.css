@@ -391,6 +391,73 @@ img {
   cursor: not-allowed;
 }
 
+.catalog-editor {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(42, 31, 61, 0.1);
+}
+
+.catalog-editor-top {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.55rem;
+}
+
+.catalog-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(42, 31, 61, 0.1);
+}
+
+.catalog-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.catalog-fields strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.catalog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+}
+
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: var(--pink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.catalog-description {
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+}
+
 .safety-note {
   margin: 0;
   font-size: 0.86rem;

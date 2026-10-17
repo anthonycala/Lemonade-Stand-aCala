@@ -6,11 +6,13 @@ Tablet-friendly point-of-sale kiosk for the stand. Tap to record lemonade and sl
 
 | Product | Price | Starting stock | Notes |
 | --- | --- | --- | --- |
-| Fresh Lemonade | $6 each | 200 cups | Standard cup + straw |
-| Passion Fruit | $8 each | 50 cups | Light-up cup + spider straw |
-| Slime Bundle | $5 (3 slimes) | 80 bundles | Not edible |
+| Fresh Lemonade | $6 each | 200 cups | Separate cup art |
+| Passion Fruit Lemonade | $8 each | 50 cups | Light-up cup + spider ring |
+| Slime Bundle | $5 (3 slimes) | 80 bundles | Original slime product photo |
 
-Starting hard costs total **$409.50**. Profit goal from the plan: **$1,110.50**. Prices are editable in Settings.
+Starting hard costs total **$409.50**. Profit goal from the plan: **$1,110.50**.
+
+In **Settings** you can change each product’s price, description, and picture (upload JPG/PNG). Custom pictures save on the device.
 
 ## Run locally
 

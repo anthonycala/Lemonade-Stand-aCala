@@ -15,6 +15,7 @@ import {
   TOTAL_HARD_COSTS,
   UPGRADES,
   charmPriceTotal,
+  createDefaultProductCatalog,
   formatMoney,
   freeCharmAllowance,
   productDisplayName,
@@ -22,11 +23,18 @@ import {
   upgradesForProduct,
   type CharmId,
   type InventoryId,
+  type ProductCatalog,
   type ProductId,
   type ProductStock,
   type UpgradeId,
 } from "./lib/business";
-import { productPrice, saleAmount } from "./lib/store";
+import {
+  fileToProductImageDataUrl,
+  productDescription,
+  productImageSrc,
+  productPrice,
+  saleAmount,
+} from "./lib/store";
 import { useStandStore } from "./lib/useStandStore";
 import "./index.css";
 
@@ -136,7 +144,11 @@ export default function App() {
     startingCash: "40",
     prices: emptyProductDraft(),
     lowStockAt: emptyLowDraft(),
+    catalog: createDefaultProductCatalog(),
   });
+  const [uploadingProduct, setUploadingProduct] = useState<ProductId | null>(
+    null
+  );
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null
   );
@@ -364,26 +376,86 @@ export default function App() {
   function openSettings() {
     const prices = {} as Record<ProductId, string>;
     const lowStockAt = {} as Record<ProductId, string>;
+    const catalog = createDefaultProductCatalog();
     for (const id of PRODUCT_IDS) {
       prices[id] = String(settings.prices[id]);
       lowStockAt[id] = String(settings.lowStockAt[id]);
+      catalog[id] = {
+        description:
+          settings.catalog?.[id]?.description ?? PRODUCTS[id].description,
+        imageDataUrl: settings.catalog?.[id]?.imageDataUrl ?? null,
+      };
     }
     setSettingsDraft({
       eventName: settings.eventName,
       startingCash: String(settings.startingCash),
       prices,
       lowStockAt,
+      catalog,
     });
     setModal("settings");
+  }
+
+  function draftImageSrc(productId: ProductId): string {
+    const custom = settingsDraft.catalog[productId]?.imageDataUrl?.trim();
+    if (custom && custom.startsWith("data:image/")) return custom;
+    return productImageSrc(productId, {
+      ...settings,
+      catalog: settingsDraft.catalog,
+    });
+  }
+
+  async function handleProductImageUpload(
+    productId: ProductId,
+    file: File | null
+  ) {
+    if (!file) return;
+    setUploadingProduct(productId);
+    try {
+      const imageDataUrl = await fileToProductImageDataUrl(file);
+      setSettingsDraft((draft) => ({
+        ...draft,
+        catalog: {
+          ...draft.catalog,
+          [productId]: {
+            ...draft.catalog[productId],
+            imageDataUrl,
+          },
+        },
+      }));
+      flash(`Updated ${PRODUCTS[productId].name} picture`);
+    } catch {
+      flash("Couldn’t use that picture — try a JPG or PNG");
+    } finally {
+      setUploadingProduct(null);
+    }
+  }
+
+  function resetProductImage(productId: ProductId) {
+    setSettingsDraft((draft) => ({
+      ...draft,
+      catalog: {
+        ...draft.catalog,
+        [productId]: {
+          ...draft.catalog[productId],
+          imageDataUrl: null,
+        },
+      },
+    }));
   }
 
   function saveSettings() {
     const startingCash = Number(settingsDraft.startingCash);
     const prices = {} as ProductStock;
     const lowStockAt = {} as ProductStock;
+    const catalog = {} as ProductCatalog;
     for (const id of PRODUCT_IDS) {
       prices[id] = Number(settingsDraft.prices[id]);
       lowStockAt[id] = Number(settingsDraft.lowStockAt[id]);
+      catalog[id] = {
+        description: settingsDraft.catalog[id].description.trim().slice(0, 240),
+        imageDataUrl: settingsDraft.catalog[id].imageDataUrl,
+      };
     }
     if (
       !Number.isFinite(startingCash) ||
@@ -410,6 +482,7 @@ export default function App() {
       startingCash,
       prices: roundedPrices,
       lowStockAt: flooredLow,
+      catalog,
     });
     closeModal();
     flash("Settings saved");
@@ -508,7 +581,7 @@ export default function App() {
               >
                 <div className="logo-wrap">
                   <img
-                    src={`${import.meta.env.BASE_URL}${product.image}`}
+                    src={productImageSrc(productId, settings)}
                     alt={product.imageAlt}
                   />
                 </div>
@@ -525,9 +598,9 @@ export default function App() {
                       {stockUnitLabel(productId, remaining)}
                     </span>
                   </div>
-                  {"includes" in product && product.includes ? (
-                    <p className="includes-note">{product.includes}</p>
-                  ) : null}
+                  <p className="includes-note">
+                    {productDescription(productId, settings)}
+                  </p>
                   {"safetyWarning" in product && product.safetyWarning ? (
                     <p className="safety-note">{product.safetyWarning}</p>
                   ) : null}
@@ -1420,9 +1493,13 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-title"
+            style={{ maxHeight: "90vh", overflow: "auto", width: "min(520px, 100%)" }}
           >
             <h3 id="settings-title">Settings</h3>
-            <p>Event name, product prices, starting cash, and low-stock alerts.</p>
+            <p>
+              Prices, pictures, descriptions, starting cash, and low-stock
+              alerts.
+            </p>
 
             <label className="reset-label" htmlFor="event-name">
               Event name
@@ -1442,29 +1519,112 @@ export default function App() {
               style={{ textTransform: "none", letterSpacing: "normal" }}
             />
 
+            <h4 className="restock-heading">Products</h4>
             {PRODUCT_IDS.map((id) => (
-              <div key={`price-${id}`}>
-                <label className="reset-label" htmlFor={`price-${id}`}>
-                  {PRODUCTS[id].name} price ($)
+              <div key={`catalog-${id}`} className="catalog-editor">
+                <div className="catalog-editor-top">
+                  <div className="catalog-preview">
+                    <img
+                      src={draftImageSrc(id)}
+                      alt={`${PRODUCTS[id].name} preview`}
+                    />
+                  </div>
+                  <div className="catalog-fields">
+                    <strong>{PRODUCTS[id].name}</strong>
+                    <label className="reset-label" htmlFor={`price-${id}`}>
+                      Price ($)
+                    </label>
+                    <input
+                      id={`price-${id}`}
+                      className="reset-input"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      value={settingsDraft.prices[id]}
+                      onChange={(event) =>
+                        setSettingsDraft((draft) => ({
+                          ...draft,
+                          prices: {
+                            ...draft.prices,
+                            [id]: event.target.value,
+                          },
+                        }))
+                      }
+                      style={{ textTransform: "none", letterSpacing: "normal" }}
+                    />
+                    <label className="reset-label" htmlFor={`low-${id}`}>
+                      Low-stock at
+                    </label>
+                    <input
+                      id={`low-${id}`}
+                      className="reset-input"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step="1"
+                      value={settingsDraft.lowStockAt[id]}
+                      onChange={(event) =>
+                        setSettingsDraft((draft) => ({
+                          ...draft,
+                          lowStockAt: {
+                            ...draft.lowStockAt,
+                            [id]: event.target.value,
+                          },
+                        }))
+                      }
+                      style={{ textTransform: "none", letterSpacing: "normal" }}
+                    />
+                    <div className="catalog-actions">
+                      <label className="upload-btn">
+                        {uploadingProduct === id
+                          ? "Uploading…"
+                          : "Upload picture"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          disabled={uploadingProduct === id}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            void handleProductImageUpload(id, file);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {settingsDraft.catalog[id].imageDataUrl ? (
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => resetProductImage(id)}
+                        >
+                          Use default
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <label className="reset-label" htmlFor={`desc-${id}`}>
+                  Description
                 </label>
-                <input
-                  id={`price-${id}`}
-                  className="reset-input"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={settingsDraft.prices[id]}
+                <textarea
+                  id={`desc-${id}`}
+                  className="reset-input catalog-description"
+                  value={settingsDraft.catalog[id].description}
+                  maxLength={240}
+                  rows={3}
                   onChange={(event) =>
                     setSettingsDraft((draft) => ({
                       ...draft,
-                      prices: {
-                        ...draft.prices,
-                        [id]: event.target.value,
+                      catalog: {
+                        ...draft.catalog,
+                        [id]: {
+                          ...draft.catalog[id],
+                          description: event.target.value,
+                        },
                       },
                     }))
                   }
-                  style={{ textTransform: "none", letterSpacing: "normal" }}
                 />
               </div>
             ))}
@@ -1488,33 +1648,6 @@ export default function App() {
               }
               style={{ textTransform: "none", letterSpacing: "normal" }}
             />
-
-            {PRODUCT_IDS.map((id) => (
-              <div key={`low-${id}`}>
-                <label className="reset-label" htmlFor={`low-${id}`}>
-                  {PRODUCTS[id].name} low-stock at
-                </label>
-                <input
-                  id={`low-${id}`}
-                  className="reset-input"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step="1"
-                  value={settingsDraft.lowStockAt[id]}
-                  onChange={(event) =>
-                    setSettingsDraft((draft) => ({
-                      ...draft,
-                      lowStockAt: {
-                        ...draft.lowStockAt,
-                        [id]: event.target.value,
-                      },
-                    }))
-                  }
-                  style={{ textTransform: "none", letterSpacing: "normal" }}
-                />
-              </div>
-            ))}
 
             <div className="modal-actions">
               <button

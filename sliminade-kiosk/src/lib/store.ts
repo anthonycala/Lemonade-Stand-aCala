@@ -10,14 +10,18 @@ import {
   TOTAL_HARD_COSTS,
   UPGRADES,
   charmPriceTotal,
+  createDefaultProductCatalog,
   createStartingInventory,
   createStartingProductStock,
+  defaultProductImageSrc,
   productDisplayName,
   upgradePriceTotal,
   usageForSale,
   type CharmId,
   type InventoryId,
   type InventoryStock,
+  type ProductCatalog,
+  type ProductCatalogEntry,
   type ProductId,
   type ProductStock,
   type UpgradeId,
@@ -81,6 +85,7 @@ export type StandSettings = {
   eventName: string;
   lowStockAt: ProductStock;
   prices: ProductStock;
+  catalog: ProductCatalog;
   startingCash: number;
   kioskLocked: boolean;
   checklist: Record<string, boolean>;
@@ -223,6 +228,7 @@ export function createDefaultSettings(): StandSettings {
     eventName: "",
     lowStockAt: { ...DEFAULT_LOW_STOCK },
     prices,
+    catalog: createDefaultProductCatalog(),
     startingCash: 40,
     kioskLocked: false,
     checklist,
@@ -234,6 +240,43 @@ export function productPrice(
   settings: StandSettings
 ): number {
   return settings.prices[productId] ?? PRODUCTS[productId].price;
+}
+
+export function productDescription(
+  productId: ProductId,
+  settings: StandSettings
+): string {
+  const custom = settings.catalog?.[productId]?.description?.trim();
+  return custom || PRODUCTS[productId].description;
+}
+
+export function productImageSrc(
+  productId: ProductId,
+  settings: StandSettings
+): string {
+  const custom = settings.catalog?.[productId]?.imageDataUrl?.trim();
+  if (custom && custom.startsWith("data:image/")) return custom;
+  return defaultProductImageSrc(productId);
+}
+
+/** Resize/compress an uploaded image for localStorage-friendly data URLs. */
+export async function fileToProductImageDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please choose an image file");
+  }
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 640;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Couldn’t process image");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.82);
 }
 
 function isProductId(value: unknown): value is ProductId {
@@ -410,11 +453,32 @@ function sanitizeSettings(value: unknown): StandSettings {
     );
   }
 
+  const catalog = createDefaultProductCatalog();
+  if (raw.catalog && typeof raw.catalog === "object") {
+    for (const id of PRODUCT_IDS) {
+      const entry = (raw.catalog as ProductCatalog)[id] as
+        | Partial<ProductCatalogEntry>
+        | undefined;
+      if (!entry || typeof entry !== "object") continue;
+      const description =
+        typeof entry.description === "string"
+          ? entry.description.trim().slice(0, 240)
+          : catalog[id].description;
+      const imageDataUrl =
+        typeof entry.imageDataUrl === "string" &&
+        entry.imageDataUrl.startsWith("data:image/")
+          ? entry.imageDataUrl
+          : null;
+      catalog[id] = { description, imageDataUrl };
+    }
+  }
+
   return {
     eventName:
       typeof raw.eventName === "string" ? raw.eventName.slice(0, 60) : "",
     lowStockAt,
     prices,
+    catalog,
     startingCash: sanitizeMoney(raw.startingCash, defaults.startingCash),
     kioskLocked: Boolean(raw.kioskLocked),
     checklist,
