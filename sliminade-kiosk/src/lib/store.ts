@@ -1,4 +1,5 @@
 import {
+  CHARM_OPTIONS,
   CHECKLIST_ITEMS,
   DEFAULT_LOW_STOCK,
   INVENTORY_IDS,
@@ -7,14 +8,19 @@ import {
   PRODUCTS,
   PROFIT_GOAL,
   TOTAL_HARD_COSTS,
+  UPGRADES,
+  charmPriceTotal,
   createStartingInventory,
   createStartingProductStock,
   productDisplayName,
+  upgradePriceTotal,
   usageForSale,
+  type CharmId,
   type InventoryId,
   type InventoryStock,
   type ProductId,
   type ProductStock,
+  type UpgradeId,
 } from "./business";
 
 const STORAGE_KEY = "sliminade-kiosk-v2";
@@ -29,6 +35,13 @@ export type Sale = {
   qty: number;
   amount: number;
   at: string;
+  upgrades: UpgradeId[];
+  charms: CharmId[];
+};
+
+export type SaleOptions = {
+  upgrades?: UpgradeId[];
+  charms?: CharmId[];
 };
 
 export type AuditEntry = {
@@ -173,13 +186,32 @@ function applyInventoryDelta(
 export function hasInventoryForSale(
   state: StandState,
   productId: ProductId,
-  qty: number
+  qty: number,
+  options: SaleOptions = {}
 ): boolean {
-  const usage = usageForSale(productId, Math.floor(qty));
+  const upgrades = options.upgrades ?? [];
+  const charms = options.charms ?? [];
+  const usage = usageForSale(productId, Math.floor(qty), upgrades, charms);
   for (const [id, amount] of Object.entries(usage) as [InventoryId, number][]) {
     if ((state.inventory[id] ?? 0) < amount) return false;
   }
   return true;
+}
+
+export function saleAmount(
+  productId: ProductId,
+  qty: number,
+  settings: StandSettings,
+  options: SaleOptions = {}
+): number {
+  const count = Math.floor(qty);
+  const upgrades = options.upgrades ?? [];
+  const charms = options.charms ?? [];
+  return (
+    productPrice(productId, settings) * count +
+    upgradePriceTotal(upgrades, count) +
+    charmPriceTotal(charms, productId === "slimeBundle" ? count : 0)
+  );
 }
 
 export function createDefaultSettings(): StandSettings {
@@ -208,21 +240,55 @@ function isProductId(value: unknown): value is ProductId {
   return typeof value === "string" && value in PRODUCTS;
 }
 
+function isUpgradeId(value: unknown): value is UpgradeId {
+  return typeof value === "string" && value in UPGRADES;
+}
+
+function isCharmId(value: unknown): value is CharmId {
+  return (
+    typeof value === "string" &&
+    CHARM_OPTIONS.some((option) => option.id === value)
+  );
+}
+
+function sanitizeSaleOptions(value: Partial<Sale>): {
+  upgrades: UpgradeId[];
+  charms: CharmId[];
+} {
+  const upgrades = Array.isArray(value.upgrades)
+    ? value.upgrades.filter(isUpgradeId)
+    : [];
+  const charms = Array.isArray(value.charms)
+    ? value.charms.filter(isCharmId)
+    : [];
+  return { upgrades, charms };
+}
+
 function isValidSale(value: unknown): value is Sale {
   if (!value || typeof value !== "object") return false;
   const sale = value as Sale;
-  return (
-    typeof sale.id === "string" &&
-    sale.id.length > 0 &&
-    isProductId(sale.productId) &&
-    typeof sale.qty === "number" &&
-    Number.isFinite(sale.qty) &&
-    sale.qty > 0 &&
-    typeof sale.amount === "number" &&
-    Number.isFinite(sale.amount) &&
-    sale.amount >= 0 &&
-    typeof sale.at === "string"
-  );
+  if (
+    !(
+      typeof sale.id === "string" &&
+      sale.id.length > 0 &&
+      isProductId(sale.productId) &&
+      typeof sale.qty === "number" &&
+      Number.isFinite(sale.qty) &&
+      sale.qty > 0 &&
+      typeof sale.amount === "number" &&
+      Number.isFinite(sale.amount) &&
+      sale.amount >= 0 &&
+      typeof sale.at === "string"
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function normalizeSale(value: Sale): Sale {
+  const { upgrades, charms } = sanitizeSaleOptions(value);
+  return { ...value, upgrades, charms };
 }
 
 function isValidAudit(value: unknown): value is AuditEntry {
@@ -254,7 +320,7 @@ function sanitizeState(value: unknown): StandState | null {
   return {
     productStock,
     inventory: sanitizeInventory(raw.inventory),
-    sales: raw.sales.filter(isValidSale),
+    sales: raw.sales.filter(isValidSale).map(normalizeSale),
     auditLog: Array.isArray(raw.auditLog)
       ? raw.auditLog.filter(isValidAudit)
       : [],
@@ -554,12 +620,13 @@ export function stockFor(state: StandState, productId: ProductId): number {
 export function canSell(
   state: StandState,
   productId: ProductId,
-  qty = 1
+  qty = 1,
+  options: SaleOptions = {}
 ): boolean {
   return (
     qty >= 1 &&
     stockFor(state, productId) >= qty &&
-    hasInventoryForSale(state, productId, qty)
+    hasInventoryForSale(state, productId, qty, options)
   );
 }
 
@@ -567,19 +634,28 @@ export function recordSale(
   state: StandState,
   productId: ProductId,
   qty = 1,
-  settings: StandSettings = createDefaultSettings()
+  settings: StandSettings = createDefaultSettings(),
+  options: SaleOptions = {}
 ): StandState {
   const count = Math.floor(qty);
-  if (!canSell(state, productId, count)) return state;
+  const upgrades = (options.upgrades ?? []).filter((id) =>
+    (UPGRADES[id].products as readonly ProductId[]).includes(productId)
+  );
+  const charms =
+    productId === "slimeBundle" ? (options.charms ?? []).filter(isCharmId) : [];
+  const saleOptions = { upgrades, charms };
+  if (!canSell(state, productId, count, saleOptions)) return state;
 
-  const unitPrice = productPrice(productId, settings);
-  const usage = usageForSale(productId, count);
+  const usage = usageForSale(productId, count, upgrades, charms);
+  const amount = saleAmount(productId, count, settings, saleOptions);
   const sale: Sale = {
     id: makeId(),
     productId,
     qty: count,
-    amount: unitPrice * count,
+    amount,
     at: new Date().toISOString(),
+    upgrades,
+    charms,
   };
 
   const next: StandState = {
@@ -593,10 +669,23 @@ export function recordSale(
     closeout: null,
   };
 
+  const extras: string[] = [];
+  if (upgrades.length > 0) {
+    extras.push(upgrades.map((id) => UPGRADES[id].name).join(" + "));
+  }
+  if (charms.length > 0) {
+    extras.push(
+      `${charms.length} charm${charms.length === 1 ? "" : "s"} (${charms
+        .map((id) => CHARM_OPTIONS.find((c) => c.id === id)?.name ?? id)
+        .join(", ")})`
+    );
+  }
+  const detailExtra = extras.length > 0 ? ` · ${extras.join(" · ")}` : "";
+
   return pushAudit(
     next,
     "sale",
-    `Sold ${count} ${productDisplayName(productId, count)} for $${sale.amount.toFixed(2)}`
+    `Sold ${count} ${productDisplayName(productId, count)} for $${sale.amount.toFixed(2)}${detailExtra}`
   );
 }
 
@@ -653,7 +742,12 @@ export function undoLastSale(state: StandState): StandState {
   const [last, ...rest] = state.sales;
   if (!last) return state;
 
-  const usage = usageForSale(last.productId, last.qty);
+  const usage = usageForSale(
+    last.productId,
+    last.qty,
+    last.upgrades ?? [],
+    last.charms ?? []
+  );
   const next: StandState = {
     ...state,
     productStock: {
@@ -729,9 +823,11 @@ export function standExportCsv(
       return `inventory,${item.name},${item.category},${item.unit},${item.startingStock},${current},${item.reorderAt}`;
     }),
     "",
-    "time,product,qty,amount",
+    "time,product,qty,amount,upgrades,charms",
     ...state.sales.map((sale) => {
-      return `${sale.at},${csvProductKey(sale.productId)},${sale.qty},${sale.amount.toFixed(2)}`;
+      const upgrades = (sale.upgrades ?? []).join("|");
+      const charms = (sale.charms ?? []).join("|");
+      return `${sale.at},${csvProductKey(sale.productId)},${sale.qty},${sale.amount.toFixed(2)},"${upgrades}","${charms}"`;
     }),
     "",
     "time,action,detail",

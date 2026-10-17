@@ -7,22 +7,23 @@ export const PRODUCTS = {
     unitLabel: "cup",
     price: 6,
     startingStock: 200,
-    image: "assets/lemonade-bucket.jpg",
-    imageAlt: "Fresh squeezed lemonade in a branded bucket",
+    image: "assets/spooky-lemonade-menu.jpg",
+    imageAlt: "Fresh squeezed lemonade in a 24 oz cup",
     cardClass: "lemonade",
     priceLabel: "each" as const,
   },
   passionFruit: {
     id: "passionFruit" as const,
-    name: "Passion Fruit",
+    name: "Passion Fruit Lemonade",
     unitLabel: "cup",
     price: 8,
     startingStock: 50,
-    image: "assets/lemonade-bucket.jpg",
-    imageAlt: "Passion fruit drink in a light-up cup with spider straw",
+    image: "assets/spooky-lemonade-menu.jpg",
+    imageAlt: "Passion fruit lemonade in a light-up cup with spider ring",
     cardClass: "passion",
     priceLabel: "each" as const,
-    includes: "Light-up cup + spider straw",
+    includes: "Includes spider ring + light-up cup!",
+    safetyWarning: "Spider ring and light are not edible.",
   },
   slimeBundle: {
     id: "slimeBundle" as const,
@@ -31,12 +32,12 @@ export const PRODUCTS = {
     price: 5,
     unitsPerSale: 3,
     startingStock: 80, // 240 slimes ÷ 3
-    image: "assets/slime-product.jpg",
-    imageAlt:
-      "Slime bundle of three colorful slime tubs — green, pink, and blue",
+    image: "assets/slime-charms-menu.jpg",
+    imageAlt: "Three glow-in-the-dark slime tubs with free Halloween charms",
     cardClass: "slime",
     priceLabel: "bundle" as const,
-    safetyWarning: "SLIME IS NOT EDIBLE, NOT SAFE TO CONSUME",
+    includes: "+ 3 free charms with every 3-slime purchase",
+    safetyWarning: "DO NOT EAT — Slime and charms are not edible.",
   },
 } as const;
 
@@ -102,11 +103,59 @@ export const INVENTORY_ITEMS = {
   },
   spiderStraws: {
     id: "spiderStraws" as const,
-    name: "Spider straws",
+    name: "Spider rings",
     category: "serving" as const,
     unit: "each",
     startingStock: 50,
     reorderAt: 5,
+  },
+  charmGhost: {
+    id: "charmGhost" as const,
+    name: "Ghost charms",
+    category: "charms" as const,
+    unit: "each",
+    startingStock: 120,
+    reorderAt: 12,
+  },
+  charmPumpkin: {
+    id: "charmPumpkin" as const,
+    name: "Pumpkin charms",
+    category: "charms" as const,
+    unit: "each",
+    startingStock: 120,
+    reorderAt: 12,
+  },
+  charmBat: {
+    id: "charmBat" as const,
+    name: "Bat charms",
+    category: "charms" as const,
+    unit: "each",
+    startingStock: 120,
+    reorderAt: 12,
+  },
+  charmBlackCat: {
+    id: "charmBlackCat" as const,
+    name: "Black cat charms",
+    category: "charms" as const,
+    unit: "each",
+    startingStock: 120,
+    reorderAt: 12,
+  },
+  charmWitchHat: {
+    id: "charmWitchHat" as const,
+    name: "Witch hat charms",
+    category: "charms" as const,
+    unit: "each",
+    startingStock: 120,
+    reorderAt: 12,
+  },
+  charmSkull: {
+    id: "charmSkull" as const,
+    name: "Skull charms",
+    category: "charms" as const,
+    unit: "each",
+    startingStock: 120,
+    reorderAt: 12,
   },
   lemons: {
     id: "lemons" as const,
@@ -212,8 +261,88 @@ export const INVENTORY_CATEGORIES: {
   { id: "serving", label: "Serving" },
   { id: "ingredients", label: "Ingredients" },
   { id: "slime", label: "Slime supplies" },
+  { id: "charms", label: "Charms" },
   { id: "packaging", label: "Packaging" },
 ];
+
+/** Paid / optional upgrades that can be added on the confirm-sale screen. */
+export const UPGRADES = {
+  lightUpCup: {
+    id: "lightUpCup" as const,
+    name: "Light-up cup",
+    price: 1,
+    products: ["lemonade"] as const satisfies readonly ProductId[],
+    inventory: { lightUpCups: 1 } as Partial<Record<InventoryId, number>>,
+    replaces: { cups: 1 } as Partial<Record<InventoryId, number>>,
+    notEdible: true,
+  },
+  spiderRing: {
+    id: "spiderRing" as const,
+    name: "Spider ring",
+    price: 1,
+    products: ["lemonade"] as const satisfies readonly ProductId[],
+    inventory: { spiderStraws: 1 } as Partial<Record<InventoryId, number>>,
+    replaces: { straws: 1 } as Partial<Record<InventoryId, number>>,
+    notEdible: true,
+  },
+} as const;
+
+export type UpgradeId = keyof typeof UPGRADES;
+export const UPGRADE_IDS = Object.keys(UPGRADES) as UpgradeId[];
+
+/** Free charm picks with every slime bundle (3 per bundle). */
+export const CHARM_OPTIONS = [
+  { id: "ghost" as const, name: "Ghost", inventoryId: "charmGhost" as const },
+  {
+    id: "pumpkin" as const,
+    name: "Pumpkin",
+    inventoryId: "charmPumpkin" as const,
+  },
+  { id: "bat" as const, name: "Bat", inventoryId: "charmBat" as const },
+  {
+    id: "blackCat" as const,
+    name: "Black cat",
+    inventoryId: "charmBlackCat" as const,
+  },
+  {
+    id: "witchHat" as const,
+    name: "Witch hat",
+    inventoryId: "charmWitchHat" as const,
+  },
+  { id: "skull" as const, name: "Skull", inventoryId: "charmSkull" as const },
+] as const;
+
+export type CharmId = (typeof CHARM_OPTIONS)[number]["id"];
+export const FREE_CHARMS_PER_BUNDLE = 3;
+export const EXTRA_CHARM_PRICE = 0.5;
+
+export function freeCharmAllowance(bundleQty: number): number {
+  return FREE_CHARMS_PER_BUNDLE * Math.max(0, Math.floor(bundleQty));
+}
+
+export function upgradesForProduct(productId: ProductId): UpgradeId[] {
+  return UPGRADE_IDS.filter((id) =>
+    (UPGRADES[id].products as readonly ProductId[]).includes(productId)
+  );
+}
+
+export function upgradePriceTotal(
+  upgradeIds: readonly UpgradeId[],
+  qty: number
+): number {
+  let total = 0;
+  for (const id of upgradeIds) total += UPGRADES[id].price * qty;
+  return total;
+}
+
+export function charmPriceTotal(
+  charmIds: readonly CharmId[],
+  bundleQty: number
+): number {
+  const free = freeCharmAllowance(bundleQty);
+  const extra = Math.max(0, charmIds.length - free);
+  return extra * EXTRA_CHARM_PRICE;
+}
 
 /** Components used per product sale quantity. */
 export const PRODUCT_USAGE: Record<
@@ -261,13 +390,39 @@ export function createStartingInventory(): InventoryStock {
 
 export function usageForSale(
   productId: ProductId,
-  qty: number
+  qty: number,
+  upgradeIds: readonly UpgradeId[] = [],
+  charmIds: readonly CharmId[] = []
 ): Partial<Record<InventoryId, number>> {
-  const base = PRODUCT_USAGE[productId];
+  const count = Math.max(0, Math.floor(qty));
   const scaled: Partial<Record<InventoryId, number>> = {};
+  const base = PRODUCT_USAGE[productId];
   for (const [id, amount] of Object.entries(base) as [InventoryId, number][]) {
-    scaled[id] = amount * qty;
+    scaled[id] = amount * count;
   }
+
+  for (const upgradeId of upgradeIds) {
+    const upgrade = UPGRADES[upgradeId];
+    for (const [id, amount] of Object.entries(upgrade.inventory) as [
+      InventoryId,
+      number,
+    ][]) {
+      scaled[id] = (scaled[id] ?? 0) + amount * count;
+    }
+    for (const [id, amount] of Object.entries(upgrade.replaces) as [
+      InventoryId,
+      number,
+    ][]) {
+      scaled[id] = Math.max(0, (scaled[id] ?? 0) - amount * count);
+    }
+  }
+
+  for (const charmId of charmIds) {
+    const option = CHARM_OPTIONS.find((item) => item.id === charmId);
+    if (!option) continue;
+    scaled[option.inventoryId] = (scaled[option.inventoryId] ?? 0) + 1;
+  }
+
   return scaled;
 }
 

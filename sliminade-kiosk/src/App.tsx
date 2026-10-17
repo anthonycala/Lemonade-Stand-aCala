@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BRAND,
+  CHARM_OPTIONS,
   CHECKLIST_ITEMS,
   DEFAULT_LOW_STOCK,
+  EXTRA_CHARM_PRICE,
   HARD_COSTS,
   INVENTORY_CATEGORIES,
   INVENTORY_IDS,
@@ -11,13 +13,20 @@ import {
   PRODUCTS,
   PROFIT_GOAL,
   TOTAL_HARD_COSTS,
+  UPGRADES,
+  charmPriceTotal,
   formatMoney,
+  freeCharmAllowance,
   productDisplayName,
+  upgradePriceTotal,
+  upgradesForProduct,
+  type CharmId,
   type InventoryId,
   type ProductId,
   type ProductStock,
+  type UpgradeId,
 } from "./lib/business";
-import { productPrice } from "./lib/store";
+import { productPrice, saleAmount } from "./lib/store";
 import { useStandStore } from "./lib/useStandStore";
 import "./index.css";
 
@@ -111,6 +120,8 @@ export default function App() {
 
   const [pending, setPending] = useState<PendingSale>(null);
   const [qty, setQty] = useState(1);
+  const [selectedUpgrades, setSelectedUpgrades] = useState<UpgradeId[]>([]);
+  const [selectedCharms, setSelectedCharms] = useState<CharmId[]>([]);
   const [modal, setModal] = useState<Modal>(null);
   const [restockTarget, setRestockTarget] = useState<RestockTarget>({
     kind: "product",
@@ -182,6 +193,8 @@ export default function App() {
         setResetTyped("");
         setPinDigits("");
         setQty(1);
+        setSelectedUpgrades([]);
+        setSelectedCharms([]);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -232,6 +245,8 @@ export default function App() {
       return;
     }
     setQty(1);
+    setSelectedUpgrades([]);
+    setSelectedCharms([]);
     setPending(productId);
   }
 
@@ -240,17 +255,52 @@ export default function App() {
     return Math.min(5, availableStock(pending));
   }
 
+  function clearPendingSale() {
+    setPending(null);
+    setQty(1);
+    setSelectedUpgrades([]);
+    setSelectedCharms([]);
+  }
+
+  function toggleUpgrade(upgradeId: UpgradeId) {
+    setSelectedUpgrades((current) =>
+      current.includes(upgradeId)
+        ? current.filter((id) => id !== upgradeId)
+        : [...current, upgradeId]
+    );
+  }
+
+  function toggleCharm(charmId: CharmId) {
+    setSelectedCharms((current) => {
+      const free = freeCharmAllowance(qty);
+      const maxAllowed = free + 6; // allow a few paid extras
+      if (current.includes(charmId)) {
+        const index = current.lastIndexOf(charmId);
+        return [...current.slice(0, index), ...current.slice(index + 1)];
+      }
+      if (current.length >= maxAllowed) return current;
+      return [...current, charmId];
+    });
+  }
+
   function confirmSale() {
     if (!pending) return;
     const productId = pending;
     const count = Math.min(qty, availableStock(productId));
-    setPending(null);
-    setQty(1);
-    const ok = sell(productId, count);
+    const options = {
+      upgrades: selectedUpgrades,
+      charms: productId === "slimeBundle" ? selectedCharms : [],
+    };
+    if (!canSellProduct(productId, count, options)) {
+      flash("Not enough supplies for those upgrades");
+      return;
+    }
+    clearPendingSale();
+    const ok = sell(productId, count, options);
     if (ok) {
       buzz();
       const label = `${count} ${productDisplayName(productId, count)} · ${formatMoney(
-        productPrice(productId, settings) * count
+        saleAmount(productId, count, settings, options)
       )}`;
       flash(label);
     } else {
@@ -659,6 +709,14 @@ export default function App() {
                           <span>
                             {PRODUCTS[sale.productId].name}
                             {sale.qty > 1 ? ` ×${sale.qty}` : ""}
+                            {(sale.upgrades?.length ?? 0) > 0
+                              ? ` · ${sale.upgrades
+                                  .map((id) => UPGRADES[id].name)
+                                  .join(" + ")}`
+                              : ""}
+                            {(sale.charms?.length ?? 0) > 0
+                              ? ` · ${sale.charms.length} charms`
+                              : ""}
                           </span>
                           <span>
                             {formatMoney(sale.amount)}{" "}
@@ -701,6 +759,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
+            style={{ maxHeight: "90vh", overflow: "auto" }}
           >
             <h3 id="confirm-title">Confirm sale</h3>
             <p>
@@ -710,10 +769,14 @@ export default function App() {
               </strong>{" "}
               for{" "}
               <strong>
-                {formatMoney(productPrice(pending, settings) * qty)}
+                {formatMoney(
+                  saleAmount(pending, qty, settings, {
+                    upgrades: selectedUpgrades,
+                    charms: pending === "slimeBundle" ? selectedCharms : [],
+                  })
+                )}
               </strong>
               ?
-              Finished goods and matching supplies will drop.
             </p>
             <div className="qty-row" aria-label="Quantity">
               <button
@@ -738,17 +801,116 @@ export default function App() {
                 +
               </button>
             </div>
-            {pending === "slimeBundle" && (
-              <div className="warning">{PRODUCTS.slimeBundle.safetyWarning}</div>
+
+            {upgradesForProduct(pending).length > 0 && (
+              <div className="upgrade-block">
+                <h4>Add upgrades</h4>
+                <p className="upgrade-hint">
+                  Base {formatMoney(productPrice(pending, settings))}
+                  {selectedUpgrades.length > 0
+                    ? ` + ${formatMoney(
+                        upgradePriceTotal(selectedUpgrades, qty)
+                      )} upgrades`
+                    : ""}
+                </p>
+                <div className="upgrade-grid">
+                  {upgradesForProduct(pending).map((upgradeId) => {
+                    const upgrade = UPGRADES[upgradeId];
+                    const selected = selectedUpgrades.includes(upgradeId);
+                    const invId = Object.keys(
+                      upgrade.inventory
+                    )[0] as InventoryId | undefined;
+                    const stockLeft = invId
+                      ? (totals.inventory[invId] ?? 0)
+                      : 0;
+                    const unavailable = invId != null && stockLeft < qty;
+                    return (
+                      <button
+                        key={upgradeId}
+                        type="button"
+                        className={`upgrade-chip${selected ? " selected" : ""}`}
+                        disabled={unavailable && !selected}
+                        onClick={() => toggleUpgrade(upgradeId)}
+                      >
+                        <strong>{upgrade.name}</strong>
+                        <span>+{formatMoney(upgrade.price)}</span>
+                        {unavailable ? (
+                          <em>Out</em>
+                        ) : (
+                          <em>{stockLeft} left</em>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(selectedUpgrades.includes("lightUpCup") ||
+                  selectedUpgrades.includes("spiderRing")) && (
+                  <div className="warning">
+                    Spider ring and light are not edible.
+                  </div>
+                )}
+              </div>
             )}
+
+            {pending === "passionFruit" && (
+              <p className="upgrade-hint">
+                Includes spider ring + light-up cup (already in the $
+                {settings.prices.passionFruit.toFixed(0)} price).
+              </p>
+            )}
+
+            {pending === "slimeBundle" && (
+              <div className="upgrade-block">
+                <h4>Pick free charms</h4>
+                <p className="upgrade-hint">
+                  {freeCharmAllowance(qty)} free with this sale
+                  {selectedCharms.length >
+                  freeCharmAllowance(qty)
+                    ? ` · extras +${formatMoney(
+                        charmPriceTotal(selectedCharms, qty)
+                      )} (${formatMoney(EXTRA_CHARM_PRICE)} each)`
+                    : ""}
+                  {" · "}
+                  selected {selectedCharms.length}
+                </p>
+                <div className="upgrade-grid">
+                  {CHARM_OPTIONS.map((charm) => {
+                    const count = selectedCharms.filter(
+                      (id) => id === charm.id
+                    ).length;
+                    const stockLeft = totals.inventory[charm.inventoryId] ?? 0;
+                    return (
+                      <button
+                        key={charm.id}
+                        type="button"
+                        className={`upgrade-chip${count > 0 ? " selected" : ""}`}
+                        disabled={stockLeft <= 0 && count === 0}
+                        onClick={() => toggleCharm(charm.id)}
+                      >
+                        <strong>{charm.name}</strong>
+                        <span>{count > 0 ? `×${count}` : "Add"}</span>
+                        <em>{stockLeft} left</em>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="warning">
+                  {PRODUCTS.slimeBundle.safetyWarning}
+                </div>
+              </div>
+            )}
+
+            {"safetyWarning" in pendingProduct &&
+              pendingProduct.safetyWarning &&
+              pending !== "slimeBundle" && (
+                <div className="warning">{pendingProduct.safetyWarning}</div>
+              )}
+
             <div className="modal-actions">
               <button
                 type="button"
                 className="cancel"
-                onClick={() => {
-                  setPending(null);
-                  setQty(1);
-                }}
+                onClick={clearPendingSale}
               >
                 Cancel
               </button>

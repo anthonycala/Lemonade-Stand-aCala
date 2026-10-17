@@ -326,6 +326,71 @@ img {
   color: var(--ink-soft);
 }
 
+.upgrade-block {
+  margin-top: 0.85rem;
+  text-align: left;
+}
+
+.upgrade-block h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.upgrade-hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.upgrade-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.upgrade-chip {
+  display: grid;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.85rem;
+  border: 2px solid rgba(42, 31, 61, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.upgrade-chip strong {
+  font-size: 0.92rem;
+}
+
+.upgrade-chip span {
+  font-weight: 800;
+  color: var(--pink);
+  font-size: 0.85rem;
+}
+
+.upgrade-chip em {
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.upgrade-chip.selected {
+  border-color: var(--pink);
+  background: #ffe0f0;
+  box-shadow: 0 0 0 1px var(--pink);
+}
+
+.upgrade-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .safety-note {
   margin: 0;
   font-size: 0.86rem;

@@ -26,9 +26,17 @@ npm run dev
 
 On iPhone: Safari → Share → **Add to Home Screen** (works offline after the first visit).
 
+## Upgrades
+
+On the confirm-sale screen:
+
+- **Lemonade:** add a light-up cup (+$1) and/or spider ring (+$1). Inventory swaps the regular cup/straw for the upgrade pieces.
+- **Passion Fruit Lemonade ($8):** spider ring + light-up cup already included.
+- **Slime Bundle:** pick **3 free charms** per bundle (ghost, pumpkin, bat, black cat, witch hat, skull). Extra charms are +$0.50 each.
+
 ## Individual inventory
 
-Sales also decrement supply pieces (cups, lids, straws, lemons, sugar/water/ice portions, slime containers, glue/activator/coloring/glitter, napkins, stickers). Light-up cups and spider straws are tracked for specialty drinks. CSV exports include a full inventory section.
+Sales also decrement supply pieces (cups, lids, straws, lemons, sugar/water/ice portions, slime containers, glue/activator/coloring/glitter, napkins, stickers, charms). Light-up cups and spider rings are tracked for drink upgrades. CSV exports include inventory plus upgrade/charm columns on each sale.
 
 ## Stand tools
 

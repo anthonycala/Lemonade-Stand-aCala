@@ -20,6 +20,7 @@ import {
   stockFor,
   undoLastSale,
   type RestorePoint,
+  type SaleOptions,
   type StandSettings,
   type StandState,
 } from "./store";
@@ -182,10 +183,12 @@ export function useStandStore() {
     totals: computeTotals(snapshot.state, snapshot.settings),
     restorePoints: snapshot.restorePoints,
     saveWarning: snapshot.saveWarning,
-    sell: (productId: ProductId, qty = 1) => {
+    sell: (productId: ProductId, qty = 1, options: SaleOptions = {}) => {
       const current = getLiveState();
-      if (!canSell(current, productId, qty)) return false;
-      setState(recordSale(current, productId, qty, getLiveSettings()));
+      if (!canSell(current, productId, qty, options)) return false;
+      setState(
+        recordSale(current, productId, qty, getLiveSettings(), options)
+      );
       return true;
     },
     restockProduct: (productId: ProductId, qty: number) => {
@@ -279,7 +282,10 @@ export function useStandStore() {
     canRestoreBackup: snapshot.backupAvailable,
     availableStock: (productId: ProductId) =>
       stockFor(snapshot.state, productId),
-    canSellProduct: (productId: ProductId, qty = 1) =>
-      canSell(snapshot.state, productId, qty),
+    canSellProduct: (
+      productId: ProductId,
+      qty = 1,
+      options: SaleOptions = {}
+    ) => canSell(snapshot.state, productId, qty, options),
   };
 }
