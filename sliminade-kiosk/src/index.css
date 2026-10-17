@@ -211,6 +211,10 @@ img {
   background: linear-gradient(135deg, #fff6b8 0%, #ffe56a 100%);
 }
 
+.product-card.passion {
+  background: linear-gradient(135deg, #ffd4a8 0%, #ff9f5a 100%);
+}
+
 .product-card.slime {
   background: linear-gradient(135deg, #e8fbc8 0%, #b8ec74 100%);
 }
@@ -306,8 +310,20 @@ img {
   background: var(--yellow);
 }
 
+.sell-btn.passion {
+  background: #ff9f5a;
+  color: var(--ink);
+}
+
 .sell-btn.slime {
   background: var(--green);
+}
+
+.includes-note {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink-soft);
 }
 
 .safety-note {
@@ -454,6 +470,10 @@ img {
 
 .stat.purple {
   background: linear-gradient(160deg, #efe6ff, #fff);
+}
+
+.stat.orange {
+  background: linear-gradient(160deg, #ffe4c8, #fff);
 }
 
 .stat .label {

@@ -7,19 +7,60 @@ export const PRODUCTS = {
     unitLabel: "cup",
     price: 6,
     startingStock: 200,
+    image: "assets/lemonade-bucket.jpg",
+    imageAlt: "Fresh squeezed lemonade in a branded bucket",
+    cardClass: "lemonade",
+    priceLabel: "each" as const,
+  },
+  passionFruit: {
+    id: "passionFruit" as const,
+    name: "Passion Fruit",
+    unitLabel: "cup",
+    price: 8,
+    startingStock: 50,
+    image: "assets/lemonade-bucket.jpg",
+    imageAlt: "Passion fruit drink in a light-up cup with spider straw",
+    cardClass: "passion",
+    priceLabel: "each" as const,
+    includes: "Light-up cup + spider straw",
   },
   slimeBundle: {
     id: "slimeBundle" as const,
     name: "Slime Bundle",
     unitLabel: "bundle",
-    price: 4,
+    price: 5,
     unitsPerSale: 3,
     startingStock: 80, // 240 slimes ÷ 3
+    image: "assets/slime-product.jpg",
+    imageAlt:
+      "Slime bundle of three colorful slime tubs — green, pink, and blue",
+    cardClass: "slime",
+    priceLabel: "bundle" as const,
     safetyWarning: "SLIME IS NOT EDIBLE, NOT SAFE TO CONSUME",
   },
 } as const;
 
 export type ProductId = keyof typeof PRODUCTS;
+export const PRODUCT_IDS = Object.keys(PRODUCTS) as ProductId[];
+export type ProductStock = Record<ProductId, number>;
+
+export function createStartingProductStock(): ProductStock {
+  const stock = {} as ProductStock;
+  for (const id of PRODUCT_IDS) {
+    stock[id] = PRODUCTS[id].startingStock;
+  }
+  return stock;
+}
+
+export function productDisplayName(productId: ProductId, qty = 1): string {
+  if (productId === "lemonade") {
+    return qty === 1 ? "lemonade" : "lemonades";
+  }
+  if (productId === "passionFruit") {
+    return qty === 1 ? "passion fruit" : "passion fruits";
+  }
+  return qty === 1 ? "slime bundle" : "slime bundles";
+}
 
 /**
  * Individual supply inventory (from stand inventory tracker).
@@ -174,7 +215,7 @@ export const INVENTORY_CATEGORIES: {
   { id: "packaging", label: "Packaging" },
 ];
 
-/** Components used per product sale quantity (1 lemonade cup or 1 slime bundle). */
+/** Components used per product sale quantity. */
 export const PRODUCT_USAGE: Record<
   ProductId,
   Partial<Record<InventoryId, number>>
@@ -188,6 +229,16 @@ export const PRODUCT_USAGE: Record<
     water: 1,
     ice: 1,
     napkins: 1,
+  },
+  passionFruit: {
+    lightUpCups: 1,
+    spiderStraws: 1,
+    lids: 1,
+    sugar: 1,
+    water: 1,
+    ice: 1,
+    napkins: 1,
+    stickers: 1,
   },
   slimeBundle: {
     // Bundle = 3 individual slimes
@@ -236,10 +287,11 @@ export const TOTAL_HARD_COSTS = HARD_COSTS.reduce((sum, row) => sum + row.amount
 export const PROFIT_GOAL = 1110.5;
 export const REVENUE_GOAL = 1520;
 
-export const DEFAULT_LOW_STOCK = {
+export const DEFAULT_LOW_STOCK: ProductStock = {
   lemonade: 20,
+  passionFruit: 5,
   slimeBundle: 10,
-} as const;
+};
 
 export const CHECKLIST_ITEMS = [
   { id: "inventory", label: "Count finished goods and supply inventory" },
@@ -252,7 +304,7 @@ export const CHECKLIST_ITEMS = [
 
 export const BRAND = {
   name: "Nayeli's Sliminade Stand",
-  tagline: "Fresh Lemonade • Cool Slime • Good Vibes",
+  tagline: "Lemonade • Passion Fruit • Cool Slime",
   slogan: "Squeeze it. Stretch it. Love it!",
   colors: {
     pink: "#FF4FA3",

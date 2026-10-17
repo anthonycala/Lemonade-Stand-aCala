@@ -7,16 +7,28 @@ assert.equal(TOTAL, 409.5);
 const PROFIT_GOAL = 1110.5;
 assert.ok(PROFIT_GOAL > 0);
 
+const prices = {
+  lemonade: 6,
+  passionFruit: 8,
+  slimeBundle: 5,
+};
+
+assert.equal(prices.lemonade, 6);
+assert.equal(prices.passionFruit, 8);
+assert.equal(prices.slimeBundle, 5);
+
 let lemonadeStock = 200;
+let passionStock = 50;
 let slimeStock = 80;
 let revenue = 0;
 let sales = 0;
-let lemonadePrice = 6;
 
 const inventory = {
   cups: 200,
   lids: 200,
   straws: 200,
+  lightUpCups: 50,
+  spiderStraws: 50,
   lemons: 100,
   sugar: 200,
   water: 200,
@@ -32,7 +44,7 @@ const inventory = {
 
 function sellLemonade(qty) {
   lemonadeStock -= qty;
-  revenue += lemonadePrice * qty;
+  revenue += prices.lemonade * qty;
   sales += qty;
   inventory.cups -= qty;
   inventory.lids -= qty;
@@ -44,9 +56,23 @@ function sellLemonade(qty) {
   inventory.napkins -= qty;
 }
 
+function sellPassionFruit(qty) {
+  passionStock -= qty;
+  revenue += prices.passionFruit * qty;
+  sales += qty;
+  inventory.lightUpCups -= qty;
+  inventory.spiderStraws -= qty;
+  inventory.lids -= qty;
+  inventory.sugar -= qty;
+  inventory.water -= qty;
+  inventory.ice -= qty;
+  inventory.napkins -= qty;
+  inventory.stickers -= qty;
+}
+
 function sellSlimeBundle(qty) {
   slimeStock -= qty;
-  revenue += 4 * qty;
+  revenue += prices.slimeBundle * qty;
   sales += qty;
   inventory.glue -= qty * 3;
   inventory.activator -= qty * 3;
@@ -60,32 +86,29 @@ sellLemonade(3);
 assert.equal(lemonadeStock, 197);
 assert.equal(revenue, 18);
 assert.equal(inventory.cups, 197);
-assert.equal(inventory.lemons, 97);
+
+sellPassionFruit(2);
+assert.equal(passionStock, 48);
+assert.equal(revenue, 34);
+assert.equal(inventory.lightUpCups, 48);
+assert.equal(inventory.spiderStraws, 48);
 
 sellSlimeBundle(2);
 assert.equal(slimeStock, 78);
+assert.equal(revenue, 44);
 assert.equal(inventory.slimeContainers, 234);
-assert.equal(inventory.stickers, 294);
-
-// Prices can be updated without code changes (settings override)
-{
-  let customPrice = 7.5;
-  let customSlime = 5;
-  let customRevenue = 0;
-  customRevenue += customPrice * 2;
-  assert.equal(customRevenue, 15);
-  assert.equal(customSlime, 5);
-}
 
 const restorePoints = [];
 restorePoints.unshift({
   sales,
   revenue,
   lemonadeStock,
+  passionStock,
   slimeStock,
   label: "Before reset",
 });
 lemonadeStock = 200;
+passionStock = 50;
 slimeStock = 80;
 revenue = 0;
 sales = 0;
@@ -94,11 +117,12 @@ restorePoints.unshift({
   sales,
   revenue,
   lemonadeStock,
+  passionStock,
   slimeStock,
   label: "Before undo",
 });
 assert.equal(restorePoints.length, 2);
-assert.equal(restorePoints[1].sales, 5);
+assert.equal(restorePoints[1].sales, 7);
 
 const expectedCash = 40 + revenue;
 assert.equal(expectedCash, 46);

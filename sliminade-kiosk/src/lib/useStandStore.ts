@@ -23,7 +23,7 @@ import {
   type StandSettings,
   type StandState,
 } from "./store";
-import type { InventoryId, ProductId } from "./business";
+import { PRODUCT_IDS, type InventoryId, type ProductId } from "./business";
 
 type Listener = () => void;
 
@@ -59,12 +59,13 @@ function rebuildSnapshot(): StoreSnapshot {
     state,
     settings,
     restorePoints,
-    backupAvailable: restorePoints.some((point) =>
-      // compare lightly without importing statesDiffer
-      point.state.sales.length !== state.sales.length ||
-      point.state.lemonadeStock !== state.lemonadeStock ||
-      point.state.slimeBundleStock !== state.slimeBundleStock ||
-      point.state.sales[0]?.id !== state.sales[0]?.id
+    backupAvailable: restorePoints.some(
+      (point) =>
+        point.state.sales.length !== state.sales.length ||
+        point.state.sales[0]?.id !== state.sales[0]?.id ||
+        PRODUCT_IDS.some(
+          (id) => point.state.productStock[id] !== state.productStock[id]
+        )
     ),
     saveWarning,
     version,
@@ -229,8 +230,10 @@ export function useStandStore() {
         : listRestorePoints().find(
             (item) =>
               item.state.sales.length !== current.sales.length ||
-              item.state.lemonadeStock !== current.lemonadeStock ||
-              item.state.slimeBundleStock !== current.slimeBundleStock
+              PRODUCT_IDS.some(
+                (id) =>
+                  item.state.productStock[id] !== current.productStock[id]
+              )
           );
       if (!point) return false;
       if (!canRestoreFromBackup(current) && !pointId) return false;

@@ -2,16 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import {
   BRAND,
   CHECKLIST_ITEMS,
+  DEFAULT_LOW_STOCK,
   HARD_COSTS,
   INVENTORY_CATEGORIES,
   INVENTORY_IDS,
   INVENTORY_ITEMS,
+  PRODUCT_IDS,
   PRODUCTS,
   PROFIT_GOAL,
   TOTAL_HARD_COSTS,
   formatMoney,
+  productDisplayName,
   type InventoryId,
   type ProductId,
+  type ProductStock,
 } from "./lib/business";
 import { productPrice } from "./lib/store";
 import { useStandStore } from "./lib/useStandStore";
@@ -34,7 +38,7 @@ type Modal =
   | "settings"
   | "pin"
   | null;
-type HistoryFilter = "all" | "lemonade" | "slime";
+type HistoryFilter = "all" | ProductId;
 
 const RESET_PHRASE = "RESET";
 const KIOSK_PIN = "1234";
@@ -55,11 +59,31 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function productLabel(productId: ProductId, qty = 1): string {
-  if (productId === "lemonade") {
-    return qty === 1 ? "lemonade" : "lemonades";
+function stockUnitLabel(productId: ProductId, remaining: number): string {
+  if (remaining === 0) return "Sold out";
+  if (productId === "slimeBundle") {
+    return `${remaining} bundle${remaining === 1 ? "" : "s"} left`;
   }
-  return qty === 1 ? "slime bundle" : "slime bundles";
+  return `${remaining} cup${remaining === 1 ? "" : "s"} left`;
+}
+
+function pricePillText(productId: ProductId, price: number): string {
+  if (productId === "slimeBundle") {
+    return `3 for ${formatMoney(price)}`;
+  }
+  return `${formatMoney(price)} each`;
+}
+
+function emptyProductDraft(): Record<ProductId, string> {
+  const draft = {} as Record<ProductId, string>;
+  for (const id of PRODUCT_IDS) draft[id] = String(PRODUCTS[id].price);
+  return draft;
+}
+
+function emptyLowDraft(): Record<ProductId, string> {
+  const draft = {} as Record<ProductId, string>;
+  for (const id of PRODUCT_IDS) draft[id] = String(DEFAULT_LOW_STOCK[id]);
+  return draft;
 }
 
 export default function App() {
@@ -99,10 +123,8 @@ export default function App() {
   const [settingsDraft, setSettingsDraft] = useState({
     eventName: "",
     startingCash: "40",
-    lemonadePrice: "6",
-    slimeBundlePrice: "4",
-    lemonadeLowAt: "20",
-    slimeLowAt: "10",
+    prices: emptyProductDraft(),
+    lowStockAt: emptyLowDraft(),
   });
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null
@@ -227,7 +249,7 @@ export default function App() {
     const ok = sell(productId, count);
     if (ok) {
       buzz();
-      const label = `${count} ${productLabel(productId, count)} · ${formatMoney(
+      const label = `${count} ${productDisplayName(productId, count)} · ${formatMoney(
         productPrice(productId, settings) * count
       )}`;
       flash(label);
@@ -257,9 +279,7 @@ export default function App() {
     closeModal();
     const label =
       restockTarget.kind === "product"
-        ? restockTarget.id === "lemonade"
-          ? "lemonade cups (+ supplies)"
-          : "slime bundles (+ supplies)"
+        ? `${productDisplayName(restockTarget.id, 10)} (+ supplies)`
         : INVENTORY_ITEMS[restockTarget.id].name;
     flash(ok ? `Restocked +10 ${label}` : "Couldn’t restock");
   }
@@ -292,45 +312,54 @@ export default function App() {
   }
 
   function openSettings() {
+    const prices = {} as Record<ProductId, string>;
+    const lowStockAt = {} as Record<ProductId, string>;
+    for (const id of PRODUCT_IDS) {
+      prices[id] = String(settings.prices[id]);
+      lowStockAt[id] = String(settings.lowStockAt[id]);
+    }
     setSettingsDraft({
       eventName: settings.eventName,
       startingCash: String(settings.startingCash),
-      lemonadePrice: String(settings.lemonadePrice),
-      slimeBundlePrice: String(settings.slimeBundlePrice),
-      lemonadeLowAt: String(settings.lemonadeLowAt),
-      slimeLowAt: String(settings.slimeLowAt),
+      prices,
+      lowStockAt,
     });
     setModal("settings");
   }
 
   function saveSettings() {
     const startingCash = Number(settingsDraft.startingCash);
-    const lemonadePrice = Number(settingsDraft.lemonadePrice);
-    const slimeBundlePrice = Number(settingsDraft.slimeBundlePrice);
-    const lemonadeLowAt = Number(settingsDraft.lemonadeLowAt);
-    const slimeLowAt = Number(settingsDraft.slimeLowAt);
+    const prices = {} as ProductStock;
+    const lowStockAt = {} as ProductStock;
+    for (const id of PRODUCT_IDS) {
+      prices[id] = Number(settingsDraft.prices[id]);
+      lowStockAt[id] = Number(settingsDraft.lowStockAt[id]);
+    }
     if (
       !Number.isFinite(startingCash) ||
       startingCash < 0 ||
-      !Number.isFinite(lemonadePrice) ||
-      lemonadePrice < 0 ||
-      !Number.isFinite(slimeBundlePrice) ||
-      slimeBundlePrice < 0 ||
-      !Number.isFinite(lemonadeLowAt) ||
-      lemonadeLowAt < 0 ||
-      !Number.isFinite(slimeLowAt) ||
-      slimeLowAt < 0
+      PRODUCT_IDS.some(
+        (id) =>
+          !Number.isFinite(prices[id]) ||
+          prices[id] < 0 ||
+          !Number.isFinite(lowStockAt[id]) ||
+          lowStockAt[id] < 0
+      )
     ) {
       flash("Check settings numbers");
       return;
     }
+    const roundedPrices = {} as ProductStock;
+    const flooredLow = {} as ProductStock;
+    for (const id of PRODUCT_IDS) {
+      roundedPrices[id] = Math.round(prices[id] * 100) / 100;
+      flooredLow[id] = Math.floor(lowStockAt[id]);
+    }
     updateSettings({
       eventName: settingsDraft.eventName.trim().slice(0, 60),
       startingCash,
-      lemonadePrice: Math.round(lemonadePrice * 100) / 100,
-      slimeBundlePrice: Math.round(slimeBundlePrice * 100) / 100,
-      lemonadeLowAt: Math.floor(lemonadeLowAt),
-      slimeLowAt: Math.floor(slimeLowAt),
+      prices: roundedPrices,
+      lowStockAt: flooredLow,
     });
     closeModal();
     flash("Settings saved");
@@ -378,20 +407,12 @@ export default function App() {
   const pendingProduct = pending ? PRODUCTS[pending] : null;
   const resetReady = resetTyped.trim().toUpperCase() === RESET_PHRASE;
   const paidOff = totals.costRecoveryPct >= 100;
-  const lemonadeLow =
-    totals.lemonadeRemaining > 0 &&
-    totals.lemonadeRemaining <= settings.lemonadeLowAt;
-  const slimeLow =
-    totals.slimeBundlesRemaining > 0 &&
-    totals.slimeBundlesRemaining <= settings.slimeLowAt;
   const locked = settings.kioskLocked;
 
   const filteredSales =
     historyFilter === "all"
       ? state.sales
-      : historyFilter === "lemonade"
-        ? state.sales.filter((sale) => sale.productId === "lemonade")
-        : state.sales.filter((sale) => sale.productId === "slimeBundle");
+      : state.sales.filter((sale) => sale.productId === historyFilter);
 
   const recentAudit = state.auditLog.slice(0, 8);
 
@@ -423,72 +444,55 @@ export default function App() {
 
       <div className="kiosk-grid">
         <section className="sell-panel" aria-label="Record a sale">
-          <article className="product-card lemonade">
-            <div className="logo-wrap">
-              <img
-                src={`${import.meta.env.BASE_URL}assets/lemonade-bucket.jpg`}
-                alt="Fresh squeezed lemonade in a branded bucket"
-              />
-            </div>
-            <div className="product-body">
-              <h2>{PRODUCTS.lemonade.name}</h2>
-              <div className="product-meta">
-                <span className="price-pill">
-                  {formatMoney(settings.lemonadePrice)} each
-                </span>
-                <span
-                  className={`stock-chip${lemonadeLow ? " low" : ""}${totals.lemonadeRemaining === 0 ? " empty" : ""}`}
-                  aria-live="polite"
-                >
-                  {totals.lemonadeRemaining === 0
-                    ? "Sold out"
-                    : `${totals.lemonadeRemaining} cups left`}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="sell-btn lemonade"
-                onClick={() => requestSale("lemonade")}
-                disabled={!canSellProduct("lemonade")}
+          {PRODUCT_IDS.map((productId) => {
+            const product = PRODUCTS[productId];
+            const remaining = totals.remaining[productId];
+            const low =
+              remaining > 0 && remaining <= settings.lowStockAt[productId];
+            const empty = remaining === 0;
+            const canSell = canSellProduct(productId);
+            return (
+              <article
+                key={productId}
+                className={`product-card ${product.cardClass}`}
               >
-                {canSellProduct("lemonade") ? "Tap to sell" : "Sold out"}
-              </button>
-            </div>
-          </article>
-
-          <article className="product-card slime">
-            <div className="logo-wrap">
-              <img
-                src={`${import.meta.env.BASE_URL}assets/slime-product.jpg`}
-                alt="Slime bundle of three colorful slime tubs — green, pink, and blue"
-              />
-            </div>
-            <div className="product-body">
-              <h2>{PRODUCTS.slimeBundle.name}</h2>
-              <div className="product-meta">
-                <span className="price-pill">
-                  3 for {formatMoney(settings.slimeBundlePrice)}
-                </span>
-                <span
-                  className={`stock-chip${slimeLow ? " low" : ""}${totals.slimeBundlesRemaining === 0 ? " empty" : ""}`}
-                  aria-live="polite"
-                >
-                  {totals.slimeBundlesRemaining === 0
-                    ? "Sold out"
-                    : `${totals.slimeBundlesRemaining} bundles left`}
-                </span>
-              </div>
-              <p className="safety-note">{PRODUCTS.slimeBundle.safetyWarning}</p>
-              <button
-                type="button"
-                className="sell-btn slime"
-                onClick={() => requestSale("slimeBundle")}
-                disabled={!canSellProduct("slimeBundle")}
-              >
-                {canSellProduct("slimeBundle") ? "Tap to sell" : "Sold out"}
-              </button>
-            </div>
-          </article>
+                <div className="logo-wrap">
+                  <img
+                    src={`${import.meta.env.BASE_URL}${product.image}`}
+                    alt={product.imageAlt}
+                  />
+                </div>
+                <div className="product-body">
+                  <h2>{product.name}</h2>
+                  <div className="product-meta">
+                    <span className="price-pill">
+                      {pricePillText(productId, settings.prices[productId])}
+                    </span>
+                    <span
+                      className={`stock-chip${low ? " low" : ""}${empty ? " empty" : ""}`}
+                      aria-live="polite"
+                    >
+                      {stockUnitLabel(productId, remaining)}
+                    </span>
+                  </div>
+                  {"includes" in product && product.includes ? (
+                    <p className="includes-note">{product.includes}</p>
+                  ) : null}
+                  {"safetyWarning" in product && product.safetyWarning ? (
+                    <p className="safety-note">{product.safetyWarning}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`sell-btn ${product.cardClass}`}
+                    onClick={() => requestSale(productId)}
+                    disabled={!canSell}
+                  >
+                    {canSell ? "Tap to sell" : "Sold out"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </section>
 
         <aside className="side-panel">
@@ -511,11 +515,15 @@ export default function App() {
               </div>
               <div className="stat pink">
                 <span className="label">Lemonades sold</span>
-                <span className="value">{totals.lemonadeSold}</span>
+                <span className="value">{totals.sold.lemonade}</span>
+              </div>
+              <div className="stat orange">
+                <span className="label">Passion fruit</span>
+                <span className="value">{totals.sold.passionFruit}</span>
               </div>
               <div className="stat purple">
                 <span className="label">Slime bundles</span>
-                <span className="value">{totals.slimeBundlesSold}</span>
+                <span className="value">{totals.sold.slimeBundle}</span>
               </div>
             </div>
 
@@ -649,9 +657,7 @@ export default function App() {
                       {state.sales.slice(0, 8).map((sale) => (
                         <li key={sale.id}>
                           <span>
-                            {sale.productId === "lemonade"
-                              ? "Lemonade"
-                              : "Slime bundle"}
+                            {PRODUCTS[sale.productId].name}
                             {sale.qty > 1 ? ` ×${sale.qty}` : ""}
                           </span>
                           <span>
@@ -700,14 +706,14 @@ export default function App() {
             <p>
               Sell{" "}
               <strong>
-                {qty} {productLabel(pending, qty)}
+                {qty} {productDisplayName(pending, qty)}
               </strong>{" "}
               for{" "}
               <strong>
                 {formatMoney(productPrice(pending, settings) * qty)}
               </strong>
               ?
-              Inventory will drop by {qty}.
+              Finished goods and matching supplies will drop.
             </p>
             <div className="qty-row" aria-label="Quantity">
               <button
@@ -947,34 +953,20 @@ export default function App() {
             </p>
             <h4 className="restock-heading">Finished goods</h4>
             <div className="tools-list">
-              <button
-                type="button"
-                className={`tool-btn${
-                  restockTarget.kind === "product" &&
-                  restockTarget.id === "lemonade"
-                    ? " selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setRestockTarget({ kind: "product", id: "lemonade" })
-                }
-              >
-                Lemonade cups (now {totals.lemonadeRemaining})
-              </button>
-              <button
-                type="button"
-                className={`tool-btn${
-                  restockTarget.kind === "product" &&
-                  restockTarget.id === "slimeBundle"
-                    ? " selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setRestockTarget({ kind: "product", id: "slimeBundle" })
-                }
-              >
-                Slime bundles (now {totals.slimeBundlesRemaining})
-              </button>
+              {PRODUCT_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`tool-btn${
+                    restockTarget.kind === "product" && restockTarget.id === id
+                      ? " selected"
+                      : ""
+                  }`}
+                  onClick={() => setRestockTarget({ kind: "product", id })}
+                >
+                  {PRODUCTS[id].name} (now {totals.remaining[id]})
+                </button>
+              ))}
             </div>
             {INVENTORY_CATEGORIES.map((category) => {
               const rows = INVENTORY_IDS.filter(
@@ -1042,20 +1034,21 @@ export default function App() {
               recorded.
             </p>
             <div className="tools-list" style={{ marginBottom: "0.85rem" }}>
-              {(
-                [
-                  ["all", "All"],
-                  ["lemonade", "Lemonade"],
-                  ["slime", "Slime"],
-                ] as const
-              ).map(([id, label]) => (
+              <button
+                type="button"
+                className={`tool-btn${historyFilter === "all" ? " selected" : ""}`}
+                onClick={() => setHistoryFilter("all")}
+              >
+                All
+              </button>
+              {PRODUCT_IDS.map((id) => (
                 <button
                   key={id}
                   type="button"
                   className={`tool-btn${historyFilter === id ? " selected" : ""}`}
                   onClick={() => setHistoryFilter(id)}
                 >
-                  {label}
+                  {PRODUCTS[id].name}
                 </button>
               ))}
             </div>
@@ -1066,9 +1059,7 @@ export default function App() {
                 {filteredSales.map((sale) => (
                   <li key={sale.id}>
                     <span>
-                      {sale.productId === "lemonade"
-                        ? "Lemonade"
-                        : "Slime bundle"}
+                      {PRODUCTS[sale.productId].name}
                       {` ×${sale.qty}`}
                     </span>
                     <span>
@@ -1140,8 +1131,10 @@ export default function App() {
                       revenue
                     </span>
                     <span style={{ display: "block", fontWeight: 600, opacity: 0.8 }}>
-                      {point.lemonadeStock} lemonade · {point.slimeBundleStock}{" "}
-                      slime · {point.salesCount} sales
+                      {PRODUCT_IDS.map(
+                        (id) => `${point.productStock[id]} ${PRODUCTS[id].name}`
+                      ).join(" · ")}{" "}
+                      · {point.salesCount} sales
                     </span>
                   </button>
                 ))}
@@ -1287,45 +1280,32 @@ export default function App() {
               style={{ textTransform: "none", letterSpacing: "normal" }}
             />
 
-            <label className="reset-label" htmlFor="lemonade-price">
-              Lemonade price ($)
-            </label>
-            <input
-              id="lemonade-price"
-              className="reset-input"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={settingsDraft.lemonadePrice}
-              onChange={(event) =>
-                setSettingsDraft((draft) => ({
-                  ...draft,
-                  lemonadePrice: event.target.value,
-                }))
-              }
-              style={{ textTransform: "none", letterSpacing: "normal" }}
-            />
-
-            <label className="reset-label" htmlFor="slime-price">
-              Slime bundle price ($)
-            </label>
-            <input
-              id="slime-price"
-              className="reset-input"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={settingsDraft.slimeBundlePrice}
-              onChange={(event) =>
-                setSettingsDraft((draft) => ({
-                  ...draft,
-                  slimeBundlePrice: event.target.value,
-                }))
-              }
-              style={{ textTransform: "none", letterSpacing: "normal" }}
-            />
+            {PRODUCT_IDS.map((id) => (
+              <div key={`price-${id}`}>
+                <label className="reset-label" htmlFor={`price-${id}`}>
+                  {PRODUCTS[id].name} price ($)
+                </label>
+                <input
+                  id={`price-${id}`}
+                  className="reset-input"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={settingsDraft.prices[id]}
+                  onChange={(event) =>
+                    setSettingsDraft((draft) => ({
+                      ...draft,
+                      prices: {
+                        ...draft.prices,
+                        [id]: event.target.value,
+                      },
+                    }))
+                  }
+                  style={{ textTransform: "none", letterSpacing: "normal" }}
+                />
+              </div>
+            ))}
 
             <label className="reset-label" htmlFor="starting-cash">
               Starting cash ($)
@@ -1347,45 +1327,32 @@ export default function App() {
               style={{ textTransform: "none", letterSpacing: "normal" }}
             />
 
-            <label className="reset-label" htmlFor="low-lemonade">
-              Lemonade low-stock at
-            </label>
-            <input
-              id="low-lemonade"
-              className="reset-input"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step="1"
-              value={settingsDraft.lemonadeLowAt}
-              onChange={(event) =>
-                setSettingsDraft((draft) => ({
-                  ...draft,
-                  lemonadeLowAt: event.target.value,
-                }))
-              }
-              style={{ textTransform: "none", letterSpacing: "normal" }}
-            />
-
-            <label className="reset-label" htmlFor="low-slime">
-              Slime low-stock at
-            </label>
-            <input
-              id="low-slime"
-              className="reset-input"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step="1"
-              value={settingsDraft.slimeLowAt}
-              onChange={(event) =>
-                setSettingsDraft((draft) => ({
-                  ...draft,
-                  slimeLowAt: event.target.value,
-                }))
-              }
-              style={{ textTransform: "none", letterSpacing: "normal" }}
-            />
+            {PRODUCT_IDS.map((id) => (
+              <div key={`low-${id}`}>
+                <label className="reset-label" htmlFor={`low-${id}`}>
+                  {PRODUCTS[id].name} low-stock at
+                </label>
+                <input
+                  id={`low-${id}`}
+                  className="reset-input"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step="1"
+                  value={settingsDraft.lowStockAt[id]}
+                  onChange={(event) =>
+                    setSettingsDraft((draft) => ({
+                      ...draft,
+                      lowStockAt: {
+                        ...draft.lowStockAt,
+                        [id]: event.target.value,
+                      },
+                    }))
+                  }
+                  style={{ textTransform: "none", letterSpacing: "normal" }}
+                />
+              </div>
+            ))}
 
             <div className="modal-actions">
               <button

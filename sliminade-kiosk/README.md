@@ -2,14 +2,15 @@
 
 Tablet-friendly point-of-sale kiosk for the stand. Tap to record lemonade and slime-bundle sales while inventory, hard costs, revenue, and profit update live.
 
-## Products (from the business plan)
+## Products
 
-| Product | Price | Starting stock |
-| --- | --- | --- |
-| Fresh Lemonade | $6 each | 200 cups |
-| Slime Bundle | $4 (3 slimes) | 80 bundles |
+| Product | Price | Starting stock | Notes |
+| --- | --- | --- | --- |
+| Fresh Lemonade | $6 each | 200 cups | Standard cup + straw |
+| Passion Fruit | $8 each | 50 cups | Light-up cup + spider straw |
+| Slime Bundle | $5 (3 slimes) | 80 bundles | Not edible |
 
-Starting hard costs total **$409.50**. Profit goal from the plan: **$1,110.50**.
+Starting hard costs total **$409.50**. Profit goal from the plan: **$1,110.50**. Prices are editable in Settings.
 
 ## Run locally
 

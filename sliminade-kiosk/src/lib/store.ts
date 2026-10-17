@@ -3,14 +3,18 @@ import {
   DEFAULT_LOW_STOCK,
   INVENTORY_IDS,
   INVENTORY_ITEMS,
+  PRODUCT_IDS,
   PRODUCTS,
   PROFIT_GOAL,
   TOTAL_HARD_COSTS,
   createStartingInventory,
+  createStartingProductStock,
+  productDisplayName,
   usageForSale,
   type InventoryId,
   type InventoryStock,
   type ProductId,
+  type ProductStock,
 } from "./business";
 
 const STORAGE_KEY = "sliminade-kiosk-v2";
@@ -42,8 +46,7 @@ export type CloseoutRecord = {
 };
 
 export type StandState = {
-  lemonadeStock: number;
-  slimeBundleStock: number;
+  productStock: ProductStock;
   inventory: InventoryStock;
   sales: Sale[];
   auditLog: AuditEntry[];
@@ -56,34 +59,29 @@ export type RestorePoint = {
   reason: "undo" | "reset" | "restock" | "closeout" | "manual";
   label: string;
   revenue: number;
-  lemonadeStock: number;
-  slimeBundleStock: number;
+  productStock: ProductStock;
   salesCount: number;
   state: StandState;
 };
 
 export type StandSettings = {
   eventName: string;
-  lemonadeLowAt: number;
-  slimeLowAt: number;
+  lowStockAt: ProductStock;
+  prices: ProductStock;
   startingCash: number;
-  lemonadePrice: number;
-  slimeBundlePrice: number;
   kioskLocked: boolean;
   checklist: Record<string, boolean>;
 };
 
 export type StandTotals = {
-  lemonadeSold: number;
-  slimeBundlesSold: number;
+  sold: ProductStock;
+  remaining: ProductStock;
   revenue: number;
   hardCosts: number;
   profit: number;
   costRecoveryPct: number;
   remainingToRecover: number;
   profitGoalPct: number;
-  lemonadeRemaining: number;
-  slimeBundlesRemaining: number;
   expectedCash: number;
   inventory: InventoryStock;
   lowInventoryIds: InventoryId[];
@@ -93,8 +91,7 @@ export type SaveResult = { ok: true } | { ok: false; error: string };
 
 export function createInitialState(): StandState {
   return {
-    lemonadeStock: PRODUCTS.lemonade.startingStock,
-    slimeBundleStock: PRODUCTS.slimeBundle.startingStock,
+    productStock: createStartingProductStock(),
     inventory: createStartingInventory(),
     sales: [],
     auditLog: [],
@@ -113,6 +110,51 @@ function sanitizeInventory(value: unknown): InventoryStock {
       next[id] = Math.max(0, Math.floor(amount));
     }
   }
+  return next;
+}
+
+function sanitizeProductStock(value: unknown, legacy?: unknown): ProductStock {
+  const defaults = createStartingProductStock();
+  const next = { ...defaults };
+
+  if (value && typeof value === "object") {
+    const raw = value as Partial<Record<ProductId, unknown>>;
+    for (const id of PRODUCT_IDS) {
+      const amount = raw[id];
+      if (typeof amount === "number" && Number.isFinite(amount)) {
+        next[id] = Math.max(0, Math.floor(amount));
+      }
+    }
+    return next;
+  }
+
+  // Migrate older saves that used lemonadeStock / slimeBundleStock fields.
+  if (legacy && typeof legacy === "object") {
+    const old = legacy as {
+      lemonadeStock?: unknown;
+      slimeBundleStock?: unknown;
+      passionFruitStock?: unknown;
+    };
+    if (
+      typeof old.lemonadeStock === "number" &&
+      Number.isFinite(old.lemonadeStock)
+    ) {
+      next.lemonade = Math.max(0, Math.floor(old.lemonadeStock));
+    }
+    if (
+      typeof old.slimeBundleStock === "number" &&
+      Number.isFinite(old.slimeBundleStock)
+    ) {
+      next.slimeBundle = Math.max(0, Math.floor(old.slimeBundleStock));
+    }
+    if (
+      typeof old.passionFruitStock === "number" &&
+      Number.isFinite(old.passionFruitStock)
+    ) {
+      next.passionFruit = Math.max(0, Math.floor(old.passionFruitStock));
+    }
+  }
+
   return next;
 }
 
@@ -143,13 +185,13 @@ export function hasInventoryForSale(
 export function createDefaultSettings(): StandSettings {
   const checklist: Record<string, boolean> = {};
   for (const item of CHECKLIST_ITEMS) checklist[item.id] = false;
+  const prices = {} as ProductStock;
+  for (const id of PRODUCT_IDS) prices[id] = PRODUCTS[id].price;
   return {
     eventName: "",
-    lemonadeLowAt: DEFAULT_LOW_STOCK.lemonade,
-    slimeLowAt: DEFAULT_LOW_STOCK.slimeBundle,
+    lowStockAt: { ...DEFAULT_LOW_STOCK },
+    prices,
     startingCash: 40,
-    lemonadePrice: PRODUCTS.lemonade.price,
-    slimeBundlePrice: PRODUCTS.slimeBundle.price,
     kioskLocked: false,
     checklist,
   };
@@ -159,13 +201,11 @@ export function productPrice(
   productId: ProductId,
   settings: StandSettings
 ): number {
-  return productId === "lemonade"
-    ? settings.lemonadePrice
-    : settings.slimeBundlePrice;
+  return settings.prices[productId] ?? PRODUCTS[productId].price;
 }
 
 function isProductId(value: unknown): value is ProductId {
-  return value === "lemonade" || value === "slimeBundle";
+  return typeof value === "string" && value in PRODUCTS;
 }
 
 function isValidSale(value: unknown): value is Sale {
@@ -198,23 +238,26 @@ function isValidAudit(value: unknown): value is AuditEntry {
 
 function sanitizeState(value: unknown): StandState | null {
   if (!value || typeof value !== "object") return null;
-  const raw = value as StandState;
-  if (
-    typeof raw.lemonadeStock !== "number" ||
-    !Number.isFinite(raw.lemonadeStock) ||
-    typeof raw.slimeBundleStock !== "number" ||
-    !Number.isFinite(raw.slimeBundleStock) ||
-    !Array.isArray(raw.sales)
-  ) {
-    return null;
-  }
+  const raw = value as StandState & {
+    lemonadeStock?: unknown;
+    slimeBundleStock?: unknown;
+    passionFruitStock?: unknown;
+  };
+  if (!Array.isArray(raw.sales)) return null;
+
+  const productStock = sanitizeProductStock(raw.productStock, raw);
+  const hasLegacyStock =
+    typeof raw.lemonadeStock === "number" ||
+    typeof raw.slimeBundleStock === "number";
+  if (!raw.productStock && !hasLegacyStock) return null;
 
   return {
-    lemonadeStock: Math.max(0, Math.floor(raw.lemonadeStock)),
-    slimeBundleStock: Math.max(0, Math.floor(raw.slimeBundleStock)),
+    productStock,
     inventory: sanitizeInventory(raw.inventory),
     sales: raw.sales.filter(isValidSale),
-    auditLog: Array.isArray(raw.auditLog) ? raw.auditLog.filter(isValidAudit) : [],
+    auditLog: Array.isArray(raw.auditLog)
+      ? raw.auditLog.filter(isValidAudit)
+      : [],
     closeout:
       raw.closeout &&
       typeof raw.closeout === "object" &&
@@ -224,10 +267,31 @@ function sanitizeState(value: unknown): StandState | null {
   };
 }
 
+function sanitizeMoney(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.round(value * 100) / 100;
+  }
+  return fallback;
+}
+
+function sanitizeCount(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  return fallback;
+}
+
 function sanitizeSettings(value: unknown): StandSettings {
   const defaults = createDefaultSettings();
   if (!value || typeof value !== "object") return defaults;
-  const raw = value as Partial<StandSettings>;
+  const raw = value as Partial<StandSettings> & {
+    lemonadeLowAt?: unknown;
+    slimeLowAt?: unknown;
+    passionFruitLowAt?: unknown;
+    lemonadePrice?: unknown;
+    slimeBundlePrice?: unknown;
+    passionFruitPrice?: unknown;
+  };
   const checklist = { ...defaults.checklist };
   if (raw.checklist && typeof raw.checklist === "object") {
     for (const item of CHECKLIST_ITEMS) {
@@ -236,32 +300,56 @@ function sanitizeSettings(value: unknown): StandSettings {
       }
     }
   }
+
+  const prices = { ...defaults.prices };
+  if (raw.prices && typeof raw.prices === "object") {
+    for (const id of PRODUCT_IDS) {
+      prices[id] = sanitizeMoney(
+        (raw.prices as ProductStock)[id],
+        defaults.prices[id]
+      );
+    }
+  } else {
+    prices.lemonade = sanitizeMoney(raw.lemonadePrice, defaults.prices.lemonade);
+    prices.slimeBundle = sanitizeMoney(
+      raw.slimeBundlePrice,
+      defaults.prices.slimeBundle
+    );
+    prices.passionFruit = sanitizeMoney(
+      raw.passionFruitPrice,
+      defaults.prices.passionFruit
+    );
+  }
+
+  const lowStockAt = { ...defaults.lowStockAt };
+  if (raw.lowStockAt && typeof raw.lowStockAt === "object") {
+    for (const id of PRODUCT_IDS) {
+      lowStockAt[id] = sanitizeCount(
+        (raw.lowStockAt as ProductStock)[id],
+        defaults.lowStockAt[id]
+      );
+    }
+  } else {
+    lowStockAt.lemonade = sanitizeCount(
+      raw.lemonadeLowAt,
+      defaults.lowStockAt.lemonade
+    );
+    lowStockAt.slimeBundle = sanitizeCount(
+      raw.slimeLowAt,
+      defaults.lowStockAt.slimeBundle
+    );
+    lowStockAt.passionFruit = sanitizeCount(
+      raw.passionFruitLowAt,
+      defaults.lowStockAt.passionFruit
+    );
+  }
+
   return {
-    eventName: typeof raw.eventName === "string" ? raw.eventName.slice(0, 60) : "",
-    lemonadeLowAt:
-      typeof raw.lemonadeLowAt === "number" && Number.isFinite(raw.lemonadeLowAt)
-        ? Math.max(0, Math.floor(raw.lemonadeLowAt))
-        : defaults.lemonadeLowAt,
-    slimeLowAt:
-      typeof raw.slimeLowAt === "number" && Number.isFinite(raw.slimeLowAt)
-        ? Math.max(0, Math.floor(raw.slimeLowAt))
-        : defaults.slimeLowAt,
-    startingCash:
-      typeof raw.startingCash === "number" && Number.isFinite(raw.startingCash)
-        ? Math.max(0, raw.startingCash)
-        : defaults.startingCash,
-    lemonadePrice:
-      typeof raw.lemonadePrice === "number" &&
-      Number.isFinite(raw.lemonadePrice) &&
-      raw.lemonadePrice >= 0
-        ? Math.round(raw.lemonadePrice * 100) / 100
-        : defaults.lemonadePrice,
-    slimeBundlePrice:
-      typeof raw.slimeBundlePrice === "number" &&
-      Number.isFinite(raw.slimeBundlePrice) &&
-      raw.slimeBundlePrice >= 0
-        ? Math.round(raw.slimeBundlePrice * 100) / 100
-        : defaults.slimeBundlePrice,
+    eventName:
+      typeof raw.eventName === "string" ? raw.eventName.slice(0, 60) : "",
+    lowStockAt,
+    prices,
+    startingCash: sanitizeMoney(raw.startingCash, defaults.startingCash),
     kioskLocked: Boolean(raw.kioskLocked),
     checklist,
   };
@@ -297,9 +385,15 @@ function inventoryDiffers(a: InventoryStock, b: InventoryStock): boolean {
   return false;
 }
 
+function productStockDiffers(a: ProductStock, b: ProductStock): boolean {
+  for (const id of PRODUCT_IDS) {
+    if (a[id] !== b[id]) return true;
+  }
+  return false;
+}
+
 function statesDiffer(a: StandState, b: StandState): boolean {
-  if (a.lemonadeStock !== b.lemonadeStock) return true;
-  if (a.slimeBundleStock !== b.slimeBundleStock) return true;
+  if (productStockDiffers(a.productStock, b.productStock)) return true;
   if (inventoryDiffers(a.inventory, b.inventory)) return true;
   if (a.sales.length !== b.sales.length) return true;
   if (a.sales[0]?.id !== b.sales[0]?.id) return true;
@@ -373,8 +467,7 @@ export function listRestorePoints(): RestorePoint[] {
         reason: point.reason ?? "manual",
         label: typeof point.label === "string" ? point.label : "Restore point",
         revenue: typeof point.revenue === "number" ? point.revenue : 0,
-        lemonadeStock: state.lemonadeStock,
-        slimeBundleStock: state.slimeBundleStock,
+        productStock: { ...state.productStock },
         salesCount: state.sales.length,
         state,
       } satisfies RestorePoint;
@@ -395,8 +488,7 @@ export function snapshotSafetyBackup(
     reason,
     label,
     revenue: totals.revenue,
-    lemonadeStock: state.lemonadeStock,
-    slimeBundleStock: state.slimeBundleStock,
+    productStock: { ...state.productStock },
     salesCount: state.sales.length,
     state,
   };
@@ -416,14 +508,13 @@ export function computeTotals(
   state: StandState,
   settings: StandSettings
 ): StandTotals {
-  let lemonadeSold = 0;
-  let slimeBundlesSold = 0;
+  const sold = createStartingProductStock();
+  for (const id of PRODUCT_IDS) sold[id] = 0;
   let revenue = 0;
 
   for (const sale of state.sales) {
     revenue += sale.amount;
-    if (sale.productId === "lemonade") lemonadeSold += sale.qty;
-    if (sale.productId === "slimeBundle") slimeBundlesSold += sale.qty;
+    sold[sale.productId] += sale.qty;
   }
 
   const hardCosts = TOTAL_HARD_COSTS;
@@ -442,16 +533,14 @@ export function computeTotals(
   });
 
   return {
-    lemonadeSold,
-    slimeBundlesSold,
+    sold,
+    remaining: { ...state.productStock },
     revenue,
     hardCosts,
     profit,
     costRecoveryPct,
     remainingToRecover,
     profitGoalPct,
-    lemonadeRemaining: state.lemonadeStock,
-    slimeBundlesRemaining: state.slimeBundleStock,
     expectedCash: settings.startingCash + revenue,
     inventory: state.inventory,
     lowInventoryIds,
@@ -459,9 +548,7 @@ export function computeTotals(
 }
 
 export function stockFor(state: StandState, productId: ProductId): number {
-  return productId === "lemonade"
-    ? state.lemonadeStock
-    : state.slimeBundleStock;
+  return state.productStock[productId] ?? 0;
 }
 
 export function canSell(
@@ -495,27 +582,21 @@ export function recordSale(
     at: new Date().toISOString(),
   };
 
-  const next: StandState =
-    productId === "lemonade"
-      ? {
-          ...state,
-          lemonadeStock: state.lemonadeStock - count,
-          inventory: applyInventoryDelta(state.inventory, usage, -1),
-          sales: [sale, ...state.sales],
-          closeout: null,
-        }
-      : {
-          ...state,
-          slimeBundleStock: state.slimeBundleStock - count,
-          inventory: applyInventoryDelta(state.inventory, usage, -1),
-          sales: [sale, ...state.sales],
-          closeout: null,
-        };
+  const next: StandState = {
+    ...state,
+    productStock: {
+      ...state.productStock,
+      [productId]: state.productStock[productId] - count,
+    },
+    inventory: applyInventoryDelta(state.inventory, usage, -1),
+    sales: [sale, ...state.sales],
+    closeout: null,
+  };
 
   return pushAudit(
     next,
     "sale",
-    `Sold ${count} ${productId === "lemonade" ? "lemonade" : "slime bundle"}${count > 1 ? "s" : ""} for $${sale.amount.toFixed(2)}`
+    `Sold ${count} ${productDisplayName(productId, count)} for $${sale.amount.toFixed(2)}`
   );
 }
 
@@ -528,23 +609,19 @@ export function restock(
   if (count <= 0) return state;
 
   const usage = usageForSale(productId, count);
-  const next =
-    productId === "lemonade"
-      ? {
-          ...state,
-          lemonadeStock: state.lemonadeStock + count,
-          inventory: applyInventoryDelta(state.inventory, usage, 1),
-        }
-      : {
-          ...state,
-          slimeBundleStock: state.slimeBundleStock + count,
-          inventory: applyInventoryDelta(state.inventory, usage, 1),
-        };
+  const next: StandState = {
+    ...state,
+    productStock: {
+      ...state.productStock,
+      [productId]: state.productStock[productId] + count,
+    },
+    inventory: applyInventoryDelta(state.inventory, usage, 1),
+  };
 
   return pushAudit(
     next,
     "restock",
-    `Restocked +${count} ${productId === "lemonade" ? "lemonade cups" : "slime bundles"} (+ matching supplies)`
+    `Restocked +${count} ${productDisplayName(productId, count)} (+ matching supplies)`
   );
 }
 
@@ -577,27 +654,21 @@ export function undoLastSale(state: StandState): StandState {
   if (!last) return state;
 
   const usage = usageForSale(last.productId, last.qty);
-  const next =
-    last.productId === "lemonade"
-      ? {
-          ...state,
-          lemonadeStock: state.lemonadeStock + last.qty,
-          inventory: applyInventoryDelta(state.inventory, usage, 1),
-          sales: rest,
-          closeout: null,
-        }
-      : {
-          ...state,
-          slimeBundleStock: state.slimeBundleStock + last.qty,
-          inventory: applyInventoryDelta(state.inventory, usage, 1),
-          sales: rest,
-          closeout: null,
-        };
+  const next: StandState = {
+    ...state,
+    productStock: {
+      ...state.productStock,
+      [last.productId]: state.productStock[last.productId] + last.qty,
+    },
+    inventory: applyInventoryDelta(state.inventory, usage, 1),
+    sales: rest,
+    closeout: null,
+  };
 
   return pushAudit(
     next,
     "undo",
-    `Undid ${last.qty} ${last.productId === "lemonade" ? "lemonade" : "slime bundle"} sale ($${last.amount.toFixed(2)})`
+    `Undid ${last.qty} ${productDisplayName(last.productId, last.qty)} sale ($${last.amount.toFixed(2)})`
   );
 }
 
@@ -620,6 +691,12 @@ export function recordCloseout(
   );
 }
 
+function csvProductKey(productId: ProductId): string {
+  if (productId === "slimeBundle") return "slime_bundle";
+  if (productId === "passionFruit") return "passion_fruit";
+  return productId;
+}
+
 export function standExportCsv(
   state: StandState,
   settings: StandSettings
@@ -631,13 +708,12 @@ export function standExportCsv(
     `summary,revenue,${totals.revenue.toFixed(2)}`,
     `summary,hard_costs,${totals.hardCosts.toFixed(2)}`,
     `summary,profit,${totals.profit.toFixed(2)}`,
-    `summary,lemonade_sold,${totals.lemonadeSold}`,
-    `summary,slime_bundles_sold,${totals.slimeBundlesSold}`,
-    `summary,lemonade_remaining,${totals.lemonadeRemaining}`,
-    `summary,slime_bundles_remaining,${totals.slimeBundlesRemaining}`,
+    ...PRODUCT_IDS.flatMap((id) => [
+      `summary,${csvProductKey(id)}_sold,${totals.sold[id]}`,
+      `summary,${csvProductKey(id)}_remaining,${totals.remaining[id]}`,
+      `summary,${csvProductKey(id)}_price,${settings.prices[id].toFixed(2)}`,
+    ]),
     `summary,starting_cash,${settings.startingCash.toFixed(2)}`,
-    `summary,lemonade_price,${settings.lemonadePrice.toFixed(2)}`,
-    `summary,slime_bundle_price,${settings.slimeBundlePrice.toFixed(2)}`,
     `summary,expected_cash,${totals.expectedCash.toFixed(2)}`,
     ...(state.closeout
       ? [
@@ -655,9 +731,7 @@ export function standExportCsv(
     "",
     "time,product,qty,amount",
     ...state.sales.map((sale) => {
-      const product =
-        sale.productId === "lemonade" ? "lemonade" : "slime_bundle";
-      return `${sale.at},${product},${sale.qty},${sale.amount.toFixed(2)}`;
+      return `${sale.at},${csvProductKey(sale.productId)},${sale.qty},${sale.amount.toFixed(2)}`;
     }),
     "",
     "time,action,detail",
