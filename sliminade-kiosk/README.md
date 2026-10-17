@@ -32,7 +32,7 @@ On iPhone: Safari → Share → **Add to Home Screen** (works offline after the 
 - Multiple restore points (Undo/Reset/Restock/Closeout)
 - Cash closeout (starting cash + revenue vs counted cash)
 - Pre-event checklist
-- Settings: event name, starting cash, low-stock thresholds
+- Settings: event name, product prices, starting cash, low-stock thresholds
 - Download/share CSV (sales + inventory + audit)
 - Kiosk lock PIN: `1234`
 - Day reset requires typing `RESET`

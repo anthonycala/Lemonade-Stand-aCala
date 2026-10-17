@@ -60,6 +60,8 @@ export type StandSettings = {
   lemonadeLowAt: number;
   slimeLowAt: number;
   startingCash: number;
+  lemonadePrice: number;
+  slimeBundlePrice: number;
   kioskLocked: boolean;
   checklist: Record<string, boolean>;
 };
@@ -98,9 +100,20 @@ export function createDefaultSettings(): StandSettings {
     lemonadeLowAt: DEFAULT_LOW_STOCK.lemonade,
     slimeLowAt: DEFAULT_LOW_STOCK.slimeBundle,
     startingCash: 40,
+    lemonadePrice: PRODUCTS.lemonade.price,
+    slimeBundlePrice: PRODUCTS.slimeBundle.price,
     kioskLocked: false,
     checklist,
   };
+}
+
+export function productPrice(
+  productId: ProductId,
+  settings: StandSettings
+): number {
+  return productId === "lemonade"
+    ? settings.lemonadePrice
+    : settings.slimeBundlePrice;
 }
 
 function isProductId(value: unknown): value is ProductId {
@@ -188,6 +201,18 @@ function sanitizeSettings(value: unknown): StandSettings {
       typeof raw.startingCash === "number" && Number.isFinite(raw.startingCash)
         ? Math.max(0, raw.startingCash)
         : defaults.startingCash,
+    lemonadePrice:
+      typeof raw.lemonadePrice === "number" &&
+      Number.isFinite(raw.lemonadePrice) &&
+      raw.lemonadePrice >= 0
+        ? Math.round(raw.lemonadePrice * 100) / 100
+        : defaults.lemonadePrice,
+    slimeBundlePrice:
+      typeof raw.slimeBundlePrice === "number" &&
+      Number.isFinite(raw.slimeBundlePrice) &&
+      raw.slimeBundlePrice >= 0
+        ? Math.round(raw.slimeBundlePrice * 100) / 100
+        : defaults.slimeBundlePrice,
     kioskLocked: Boolean(raw.kioskLocked),
     checklist,
   };
@@ -385,17 +410,18 @@ export function canSell(
 export function recordSale(
   state: StandState,
   productId: ProductId,
-  qty = 1
+  qty = 1,
+  settings: StandSettings = createDefaultSettings()
 ): StandState {
   const count = Math.floor(qty);
   if (!canSell(state, productId, count)) return state;
 
-  const product = PRODUCTS[productId];
+  const unitPrice = productPrice(productId, settings);
   const sale: Sale = {
     id: makeId(),
     productId,
     qty: count,
-    amount: product.price * count,
+    amount: unitPrice * count,
     at: new Date().toISOString(),
   };
 
@@ -502,6 +528,8 @@ export function standExportCsv(
     `summary,lemonade_remaining,${totals.lemonadeRemaining}`,
     `summary,slime_bundles_remaining,${totals.slimeBundlesRemaining}`,
     `summary,starting_cash,${settings.startingCash.toFixed(2)}`,
+    `summary,lemonade_price,${settings.lemonadePrice.toFixed(2)}`,
+    `summary,slime_bundle_price,${settings.slimeBundlePrice.toFixed(2)}`,
     `summary,expected_cash,${totals.expectedCash.toFixed(2)}`,
     ...(state.closeout
       ? [

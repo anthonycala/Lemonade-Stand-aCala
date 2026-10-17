@@ -9,6 +9,7 @@ import {
   formatMoney,
   type ProductId,
 } from "./lib/business";
+import { productPrice } from "./lib/store";
 import { useStandStore } from "./lib/useStandStore";
 import "./index.css";
 
@@ -87,6 +88,8 @@ export default function App() {
   const [settingsDraft, setSettingsDraft] = useState({
     eventName: "",
     startingCash: "40",
+    lemonadePrice: "6",
+    slimeBundlePrice: "4",
     lemonadeLowAt: "20",
     slimeLowAt: "10",
   });
@@ -214,7 +217,7 @@ export default function App() {
     if (ok) {
       buzz();
       const label = `${count} ${productLabel(productId, count)} · ${formatMoney(
-        PRODUCTS[productId].price * count
+        productPrice(productId, settings) * count
       )}`;
       flash(label);
     } else {
@@ -278,6 +281,8 @@ export default function App() {
     setSettingsDraft({
       eventName: settings.eventName,
       startingCash: String(settings.startingCash),
+      lemonadePrice: String(settings.lemonadePrice),
+      slimeBundlePrice: String(settings.slimeBundlePrice),
       lemonadeLowAt: String(settings.lemonadeLowAt),
       slimeLowAt: String(settings.slimeLowAt),
     });
@@ -286,11 +291,17 @@ export default function App() {
 
   function saveSettings() {
     const startingCash = Number(settingsDraft.startingCash);
+    const lemonadePrice = Number(settingsDraft.lemonadePrice);
+    const slimeBundlePrice = Number(settingsDraft.slimeBundlePrice);
     const lemonadeLowAt = Number(settingsDraft.lemonadeLowAt);
     const slimeLowAt = Number(settingsDraft.slimeLowAt);
     if (
       !Number.isFinite(startingCash) ||
       startingCash < 0 ||
+      !Number.isFinite(lemonadePrice) ||
+      lemonadePrice < 0 ||
+      !Number.isFinite(slimeBundlePrice) ||
+      slimeBundlePrice < 0 ||
       !Number.isFinite(lemonadeLowAt) ||
       lemonadeLowAt < 0 ||
       !Number.isFinite(slimeLowAt) ||
@@ -302,6 +313,8 @@ export default function App() {
     updateSettings({
       eventName: settingsDraft.eventName.trim().slice(0, 60),
       startingCash,
+      lemonadePrice: Math.round(lemonadePrice * 100) / 100,
+      slimeBundlePrice: Math.round(slimeBundlePrice * 100) / 100,
       lemonadeLowAt: Math.floor(lemonadeLowAt),
       slimeLowAt: Math.floor(slimeLowAt),
     });
@@ -407,7 +420,7 @@ export default function App() {
               <h2>{PRODUCTS.lemonade.name}</h2>
               <div className="product-meta">
                 <span className="price-pill">
-                  {formatMoney(PRODUCTS.lemonade.price)} each
+                  {formatMoney(settings.lemonadePrice)} each
                 </span>
                 <span
                   className={`stock-chip${lemonadeLow ? " low" : ""}${totals.lemonadeRemaining === 0 ? " empty" : ""}`}
@@ -440,7 +453,7 @@ export default function App() {
               <h2>{PRODUCTS.slimeBundle.name}</h2>
               <div className="product-meta">
                 <span className="price-pill">
-                  3 for {formatMoney(PRODUCTS.slimeBundle.price)}
+                  3 for {formatMoney(settings.slimeBundlePrice)}
                 </span>
                 <span
                   className={`stock-chip${slimeLow ? " low" : ""}${totals.slimeBundlesRemaining === 0 ? " empty" : ""}`}
@@ -635,7 +648,10 @@ export default function App() {
                 {qty} {productLabel(pending, qty)}
               </strong>{" "}
               for{" "}
-              <strong>{formatMoney(pendingProduct.price * qty)}</strong>?
+              <strong>
+                {formatMoney(productPrice(pending, settings) * qty)}
+              </strong>
+              ?
               Inventory will drop by {qty}.
             </p>
             <div className="qty-row" aria-label="Quantity">
@@ -1147,7 +1163,7 @@ export default function App() {
             aria-labelledby="settings-title"
           >
             <h3 id="settings-title">Settings</h3>
-            <p>Event name, starting cash, and low-stock alerts.</p>
+            <p>Event name, product prices, starting cash, and low-stock alerts.</p>
 
             <label className="reset-label" htmlFor="event-name">
               Event name
@@ -1164,6 +1180,46 @@ export default function App() {
               }
               maxLength={60}
               placeholder="School fair, block party…"
+              style={{ textTransform: "none", letterSpacing: "normal" }}
+            />
+
+            <label className="reset-label" htmlFor="lemonade-price">
+              Lemonade price ($)
+            </label>
+            <input
+              id="lemonade-price"
+              className="reset-input"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={settingsDraft.lemonadePrice}
+              onChange={(event) =>
+                setSettingsDraft((draft) => ({
+                  ...draft,
+                  lemonadePrice: event.target.value,
+                }))
+              }
+              style={{ textTransform: "none", letterSpacing: "normal" }}
+            />
+
+            <label className="reset-label" htmlFor="slime-price">
+              Slime bundle price ($)
+            </label>
+            <input
+              id="slime-price"
+              className="reset-input"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={settingsDraft.slimeBundlePrice}
+              onChange={(event) =>
+                setSettingsDraft((draft) => ({
+                  ...draft,
+                  slimeBundlePrice: event.target.value,
+                }))
+              }
               style={{ textTransform: "none", letterSpacing: "normal" }}
             />
 

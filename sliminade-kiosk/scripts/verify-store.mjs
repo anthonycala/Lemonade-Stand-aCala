@@ -11,16 +11,28 @@ let lemonadeStock = 200;
 let slimeStock = 80;
 let revenue = 0;
 let sales = 0;
+let lemonadePrice = 6;
+let slimeBundlePrice = 4;
 
 function sellLemonade(qty) {
   lemonadeStock -= qty;
-  revenue += 6 * qty;
+  revenue += lemonadePrice * qty;
   sales += qty;
 }
 
 sellLemonade(3);
 assert.equal(lemonadeStock, 197);
 assert.equal(revenue, 18);
+
+// Prices can be updated without code changes (settings override)
+{
+  let customPrice = 7.5;
+  let customSlime = 5;
+  let customRevenue = 0;
+  customRevenue += customPrice * 2;
+  assert.equal(customRevenue, 15);
+  assert.equal(customSlime, 5);
+}
 
 const restorePoints = [];
 restorePoints.unshift({

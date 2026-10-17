@@ -183,7 +183,7 @@ export function useStandStore() {
     sell: (productId: ProductId, qty = 1) => {
       const current = getLiveState();
       if (!canSell(current, productId, qty)) return false;
-      setState(recordSale(current, productId, qty));
+      setState(recordSale(current, productId, qty, getLiveSettings()));
       return true;
     },
     restockProduct: (productId: ProductId, qty: number) => {
