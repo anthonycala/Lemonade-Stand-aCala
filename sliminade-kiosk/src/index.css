@@ -449,13 +449,14 @@ img {
   cursor: pointer;
 }
 
-.catalog-description {
+.reset-input.catalog-description {
   width: 100%;
   min-height: 4.5rem;
   resize: vertical;
   text-transform: none;
   letter-spacing: normal;
   font-weight: 600;
+  text-align: left;
 }
 
 .safety-note {
